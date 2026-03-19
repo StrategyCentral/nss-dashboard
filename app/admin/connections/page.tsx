@@ -13,9 +13,19 @@ const AD_PLATFORMS = [
     bg: 'rgba(24,119,242,0.08)',
     border: 'rgba(24,119,242,0.25)',
     icon: <svg width="26" height="26" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>,
-    setupSteps: ['Go to developers.facebook.com → My Apps → Create App', 'Choose "Business" type → name it "NSS Dashboard"', 'Add "Marketing API" use case in app settings', 'Copy App ID + App Secret below → Save → Connect'],
-    envVars: [{ key: 'facebook_app_id', label: 'App ID', hint: '1234567890' }, { key: 'facebook_app_secret', label: 'App Secret', hint: 'abc123...', secret: true }],
-    scopes: 'ads_read, ads_management, business_management',
+    tokenPaste: true,
+    setupSteps: [
+      'Go to business.facebook.com → Settings → System Users',
+      'Click the "james" system user (Admin access) → Generate token',
+      'Select the "NSS Analytics" app → click Next → Generate token',
+      'Copy the token and paste it below → click Save Token',
+      'Get your Ad Account ID from Ads Manager (format: act_XXXXXXXXXX)',
+    ],
+    envVars: [
+      { key: 'facebook_access_token', label: 'System User Access Token', hint: 'EAABsbCS...', secret: true },
+      { key: 'facebook_ad_account_id', label: 'Ad Account ID', hint: 'act_796136010465428' },
+    ],
+    scopes: 'System User token — no OAuth required',
   },
   {
     id: 'tiktok',
@@ -332,14 +342,21 @@ function ConnectionsPage() {
                         ))}
                       </div>
                       <div style={{ display: 'flex', gap: 10 }}>
-                        <button onClick={saveAll} className="btn btn-ghost" disabled={saving}
-                          style={{ fontSize: 12, background: saved ? 'rgba(168,207,69,0.15)' : undefined, color: saved ? 'var(--green)' : undefined }}>
-                          {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save'}
+                        <button onClick={saveAll} className="btn btn-pink" disabled={saving}
+                          style={{ fontSize: 12, background: saved ? 'rgba(168,207,69,0.15)' : undefined, color: saved ? 'var(--green)' : undefined, borderColor: saved ? 'rgba(168,207,69,0.3)' : undefined }}>
+                          {saving ? 'Saving…' : saved ? '✓ Token Saved' : (p as any).tokenPaste ? 'Save Token' : `Connect ${p.name.split(' ')[0]} →`}
                         </button>
-                        <a href={`/api/oauth/${p.id}`} className="btn btn-pink" style={{ fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          Connect {p.name.split(' ')[0]} →
-                        </a>
+                        {!(p as any).tokenPaste && (
+                          <a href={`/api/oauth/${p.id}`} className="btn btn-ghost" style={{ fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            Connect via OAuth →
+                          </a>
+                        )}
                       </div>
+                      {(p as any).tokenPaste && (
+                        <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+                          Meta&apos;s Marketing API requires app review for OAuth. Paste your System User token above — it never expires and works immediately.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
