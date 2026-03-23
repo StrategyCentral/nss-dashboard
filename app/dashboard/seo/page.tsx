@@ -105,6 +105,8 @@ function NodeDetailPanel({ node, keywords, nodes, onClose, onRefresh }: any) {
   const [reassignParent, setReassignParent] = useState('');
   const [revenueData, setRevenueData] = useState<any>(null);
   const [revenueLoading, setRevenueLoading] = useState(false);
+  const [crawlData, setCrawlData] = useState<any>(null);
+  const [crawling, setCrawling] = useState(false);
 
   const SHOW_REVENUE_TYPES = ['product', 'product-cat', 'category', 'silo'];
 
@@ -113,6 +115,7 @@ function NodeDetailPanel({ node, keywords, nodes, onClose, onRefresh }: any) {
     setEditing(false);
     setShowDeleteConfirm(false);
     setRevenueData(null);
+    setCrawlData(null);
     if (SHOW_REVENUE_TYPES.includes(node.type) && node.url) {
       setRevenueLoading(true);
       fetch(`/api/woo/revenue?url=${encodeURIComponent(node.url)}&traffic=${node.traffic || 0}`)
@@ -157,6 +160,21 @@ function NodeDetailPanel({ node, keywords, nodes, onClose, onRefresh }: any) {
     onRefresh();
   }
 
+  async function crawlPage() {
+    if (!node.url || crawling) return;
+    setCrawling(true);
+    setCrawlData(null);
+    try {
+      const r = await fetch('/api/seo/crawl', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId: node.id || node.nodeId, url: node.url }),
+      });
+      const d = await r.json();
+      setCrawlData(d);
+      onRefresh();
+    } finally { setCrawling(false); }
+  }
+
   return (
     <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 420, zIndex: 1000,
       background: 'rgba(10,10,14,0.97)', backdropFilter: 'blur(20px)',
@@ -179,6 +197,16 @@ function NodeDetailPanel({ node, keywords, nodes, onClose, onRefresh }: any) {
               color: editing ? '#a78bfa' : 'var(--muted)', padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12 }}>
             {editing ? '✕ Cancel' : '✏ Edit'}
           </button>
+          {node.url && (
+            <button
+              onClick={crawlPage}
+              title="Crawl page — checks live status, word count, meta, schema"
+              style={{ background: crawling ? 'rgba(4,170,232,0.15)' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${crawling ? 'rgba(4,170,232,0.4)' : 'var(--border)'}`,
+                color: crawling ? '#04aae8' : 'var(--muted)', padding: '5px 10px', borderRadius: 7, cursor: crawling ? 'default' : 'pointer', fontSize: 12 }}>
+              {crawling ? '⟳' : '↺'}
+            </button>
+          )}
           <button
             onClick={() => { setShowDeleteConfirm(!showDeleteConfirm); setEditing(false); }}
             style={{ background: showDeleteConfirm ? 'rgba(255,80,80,0.15)' : 'rgba(255,255,255,0.06)',
@@ -340,6 +368,103 @@ function NodeDetailPanel({ node, keywords, nodes, onClose, onRefresh }: any) {
               </div>
             </>
           ) : null}
+        </div>
+      )}
+
+      {/* Crawl Results */}
+      {crawlData && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Page Crawl Results
+            </div>
+            <span style={{ fontSize: 10, color: 'var(--muted)' }}>{new Date(crawlData.crawledAt).toLocaleTimeString()}</span>
+          </div>
+
+          {/* Live status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+            background: crawlData.isLive ? 'rgba(168,207,69,0.08)' : 'rgba(255,80,80,0.08)',
+            border: `1px solid ${crawlData.isLive ? 'rgba(168,207,69,0.25)' : 'rgba(255,80,80,0.25)'}`,
+            borderRadius: 8, marginBottom: 12 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: crawlData.isLive ? '#a8cf45' : '#ff5050',
+              boxShadow: crawlData.isLive ? '0 0 6px #a8cf45' : '0 0 6px #ff5050' }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: crawlData.isLive ? '#a8cf45' : '#ff5050' }}>
+              {crawlData.isLive ? `Live (HTTP ${crawlData.status})` : 'Not Live / Unreachable'}
+            </span>
+          </div>
+
+          {/* Stats row */}
+          {crawlData.isLive && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+              {[
+                { label: 'Word Count', value: crawlData.wordCount?.toLocaleString() || '—', color: crawlData.wordCount >= 600 ? '#a8cf45' : crawlData.wordCount >= 300 ? '#ffe600' : '#ff5050' },
+                { label: 'Images', value: `${crawlData.meta?.imgCount || 0} (${crawlData.meta?.imgNoAlt || 0} no alt)`, color: (crawlData.meta?.imgNoAlt || 0) > 0 ? '#ffe600' : '#a8cf45' },
+                { label: 'Headings', value: `H1:${crawlData.meta?.h1 ? '✓' : '✗'} H2:${crawlData.meta?.h2Count || 0} H3:${crawlData.meta?.h3Count || 0}`, color: crawlData.meta?.h1 ? '#a8cf45' : '#ff5050' },
+              ].map(s => (
+                <div key={s.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 7, padding: '8px 10px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>{s.label}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Meta data */}
+          {crawlData.isLive && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>META DATA</div>
+              {[
+                { label: 'Title', value: crawlData.meta?.title, max: 65, min: 30 },
+                { label: 'Description', value: crawlData.meta?.description, max: 165, min: 100 },
+                { label: 'H1', value: crawlData.meta?.h1, max: 999, min: 1 },
+                { label: 'Canonical', value: crawlData.meta?.canonical, max: 999, min: 1 },
+              ].map(m => (
+                <div key={m.label} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>{m.label}</span>
+                    {m.value && <span style={{ fontSize: 10, color: m.value.length > m.max || m.value.length < m.min ? '#ffe600' : '#a8cf45' }}>{m.value.length} chars</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: m.value ? 'var(--text)' : '#ff5050', wordBreak: 'break-word', lineHeight: 1.4 }}>
+                    {m.value || `Missing ${m.label}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Schema */}
+          {crawlData.isLive && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>SCHEMA MARKUP</div>
+              {crawlData.schemas?.length > 0 ? (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {crawlData.schemas.map((s: string) => (
+                    <span key={s} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 12,
+                      background: 'rgba(168,207,69,0.1)', color: '#a8cf45', border: '1px solid rgba(168,207,69,0.25)' }}>
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span style={{ fontSize: 11, color: '#ff8c42' }}>No schema detected — add Product/BreadcrumbList/Article schema</span>
+              )}
+            </div>
+          )}
+
+          {/* Issues */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>SEO ISSUES</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {crawlData.issues?.map((issue: any, i: number) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 10px',
+                  background: issue.severity === 'error' ? 'rgba(255,80,80,0.08)' : issue.severity === 'warning' ? 'rgba(255,140,66,0.08)' : 'rgba(255,255,255,0.04)',
+                  borderRadius: 7, border: `1px solid ${issue.severity === 'error' ? 'rgba(255,80,80,0.2)' : issue.severity === 'warning' ? 'rgba(255,140,66,0.2)' : 'var(--border)'}` }}>
+                  <span style={{ fontSize: 13, flexShrink: 0 }}>{issue.severity === 'error' ? '🔴' : issue.severity === 'warning' ? '🟡' : 'ℹ️'}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>{issue.message}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
