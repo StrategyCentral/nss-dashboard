@@ -11,8 +11,17 @@ const PERIODS = [
 
 const NODE_COLORS: Record<string, string> = {
   home: '#ff1e8e', silo: '#a8cf45', category: '#04aae8',
-  post: '#ffe600', product: '#ff8c42', 'product-cat': '#c084fc',
+  post: '#ffe600', 'sa-post': '#f97316', page: '#a78bfa',
+  'location-page': '#22d3ee', product: '#ff8c42', 'product-cat': '#c084fc',
 };
+
+const NODE_TYPE_LABELS: Record<string, string> = {
+  home: 'Home', silo: 'Silo', category: 'Category',
+  post: 'Blog Post', 'sa-post': 'SA Post', page: 'Page',
+  'location-page': 'Location Page', product: 'Product', 'product-cat': 'Product Category',
+};
+
+const ALL_TYPES = ['silo', 'category', 'post', 'sa-post', 'page', 'location-page', 'product-cat', 'product'];
 
 function KpiCard({ label, value, sub, color, prev, tooltip }: any) {
   const raw = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.]/g, '')) : value;
@@ -48,36 +57,153 @@ function PosBadge({ pos }: { pos: number | null }) {
   );
 }
 
-function NodeDetailPanel({ node, keywords, onClose }: any) {
+function NodeDetailPanel({ node, keywords, nodes, onClose, onRefresh }: any) {
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<any>({ label: '', url: '', type: 'page', status: 'planned' });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [reassignParent, setReassignParent] = useState('');
+
   if (!node) return null;
   const nodeKeywords = keywords.filter((k: any) => k.url === node.url);
   const color = NODE_COLORS[node.type] || '#888';
+  const estRevenue = Math.round((node.traffic || 0) * 4.2); // ~4.2% conversion × avg order
+  const childNodes = nodes.filter((n: any) => n.parent === (node.id || node.nodeId));
+
+  async function saveEdit() {
+    await fetch('/api/seo/structure', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_node', id: node.id || node.nodeId, ...editForm }),
+    });
+    setEditing(false);
+    onRefresh();
+  }
+
+  async function deleteNode() {
+    // First reassign children if needed
+    if (childNodes.length > 0 && reassignParent) {
+      for (const child of childNodes) {
+        await fetch('/api/seo/structure', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update_node', id: child.id || child.nodeId, parent: reassignParent }),
+        });
+      }
+    }
+    await fetch('/api/seo/structure', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete_node', id: node.id || node.nodeId }),
+    });
+    onClose();
+    onRefresh();
+  }
+
   return (
-    <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 380, zIndex: 1000,
+    <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 400, zIndex: 1000,
       background: 'rgba(10,10,14,0.97)', backdropFilter: 'blur(20px)',
       borderLeft: `1px solid ${color}44`, padding: 24, overflowY: 'auto',
       boxShadow: `-8px 0 40px rgba(0,0,0,0.6)` }}>
+
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 13, color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{node.type}</div>
+          <div style={{ fontSize: 12, color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+            {NODE_TYPE_LABELS[node.type] || node.type}
+          </div>
           <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif" }}>{node.label}</div>
         </div>
-        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: 'var(--muted)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => { if (!editing) setEditForm({ label: node.label, url: node.url || '', type: node.type, status: node.status }); setEditing(!editing); setShowDeleteConfirm(false); }}
+            style={{ background: editing ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${editing ? '#a78bfa44' : 'var(--border)'}`,
+              color: editing ? '#a78bfa' : 'var(--muted)', padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12 }}>
+            {editing ? '✕ Cancel' : '✏ Edit'}
+          </button>
+          <button onClick={() => { setShowDeleteConfirm(!showDeleteConfirm); setEditing(false); }}
+            style={{ background: showDeleteConfirm ? 'rgba(255,80,80,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${showDeleteConfirm ? 'rgba(255,80,80,0.4)' : 'var(--border)'}`,
+              color: showDeleteConfirm ? '#ff5050' : 'var(--muted)', padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12 }}>
+            🗑
+          </button>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: 'var(--muted)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
       </div>
+
+      {/* Edit Form */}
+      {editing && (
+        <div style={{ background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div><label className="form-label">Page Name</label>
+              <input className="form-input" value={editForm.label} onChange={e => setEditForm(f => ({ ...f, label: e.target.value }))} /></div>
+            <div><label className="form-label">URL</label>
+              <input className="form-input" value={editForm.url} onChange={e => setEditForm(f => ({ ...f, url: e.target.value }))} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div><label className="form-label">Type</label>
+                <select className="form-input" value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value }))}>
+                  {ALL_TYPES.map(t => <option key={t} value={t}>{NODE_TYPE_LABELS[t] || t}</option>)}
+                </select></div>
+              <div><label className="form-label">Status</label>
+                <select className="form-input" value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}>
+                  {['live','planned','broken'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select></div>
+            </div>
+          </div>
+          <button onClick={saveEdit} className="btn btn-pink" style={{ fontSize: 12, marginTop: 12, width: '100%' }}>Save Changes</button>
+        </div>
+      )}
+
+      {/* Delete Confirm */}
+      {showDeleteConfirm && (
+        <div style={{ background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.3)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: '#ff5050', fontWeight: 700, marginBottom: 8 }}>⚠ Delete &quot;{node.label}&quot;?</div>
+          {childNodes.length > 0 ? (
+            <>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                This page has <strong style={{ color: 'var(--text)' }}>{childNodes.length} child page{childNodes.length > 1 ? 's' : ''}</strong> underneath it.
+                Reassign them to a new parent before deleting:
+              </div>
+              <label className="form-label">Reassign children to</label>
+              <select className="form-input" value={reassignParent} onChange={e => setReassignParent(e.target.value)} style={{ marginBottom: 12 }}>
+                <option value="">— Select new parent —</option>
+                {nodes.filter((n: any) => (n.id || n.nodeId) !== (node.id || node.nodeId)).map((n: any) => (
+                  <option key={n.id || n.nodeId} value={n.id || n.nodeId}>{n.label}</option>
+                ))}
+              </select>
+              <button onClick={deleteNode} disabled={!reassignParent} className="btn btn-ghost"
+                style={{ fontSize: 12, width: '100%', color: '#ff5050', borderColor: 'rgba(255,80,80,0.4)',
+                  opacity: !reassignParent ? 0.4 : 1 }}>
+                Reassign &amp; Delete
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>This will permanently remove the page from the structure map.</div>
+              <button onClick={deleteNode} className="btn btn-ghost"
+                style={{ fontSize: 12, width: '100%', color: '#ff5050', borderColor: 'rgba(255,80,80,0.4)' }}>
+                Confirm Delete
+              </button>
+            </>
+          )}
+          <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-ghost" style={{ fontSize: 12, width: '100%', marginTop: 8 }}>Cancel</button>
+        </div>
+      )}
+
       {node.url && <div style={{ fontSize: 12, color: 'var(--blue)', background: 'rgba(4,170,232,0.08)', padding: '6px 10px', borderRadius: 6, marginBottom: 16 }}>{node.url}</div>}
+
+      {/* Stats grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
         {[
           { label: 'Position', value: node.position || '—', color },
-          { label: 'Monthly Traffic', value: (node.traffic || 0).toLocaleString(), color: '#04aae8' },
-          { label: 'Clicks', value: (node.clicks || 0).toLocaleString(), color: '#a8cf45' },
+          { label: 'Monthly Traffic', value: (node.traffic || 0).toLocaleString() + ' visits', color: '#04aae8', hint: 'Estimated organic visits/month from Google' },
+          { label: 'Monthly Clicks', value: (node.clicks || 0).toLocaleString(), color: '#a8cf45' },
+          { label: 'Est. Revenue', value: estRevenue > 0 ? '$' + estRevenue.toLocaleString() : '—', color: '#ffe600', hint: 'Estimated revenue based on traffic × avg conversion' },
           { label: 'Status', value: node.status, color: node.status === 'live' ? '#a8cf45' : node.status === 'broken' ? '#ff5050' : '#888' },
+          { label: 'Type', value: NODE_TYPE_LABELS[node.type] || node.type, color: NODE_COLORS[node.type] || '#888' },
         ].map(m => (
-          <div key={m.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '10px 12px' }}>
+          <div key={m.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '10px 12px' }} title={(m as any).hint || ''}>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{m.label}</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: m.color }}>{m.value}</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: m.color }}>{m.value}</div>
           </div>
         ))}
       </div>
+
+      {/* Keywords */}
       {nodeKeywords.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Ranking Keywords</div>
@@ -90,6 +216,8 @@ function NodeDetailPanel({ node, keywords, onClose }: any) {
           ))}
         </div>
       )}
+
+      {/* Ranking Opportunity */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Ranking Opportunity</div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 14 }}>
@@ -102,6 +230,7 @@ function NodeDetailPanel({ node, keywords, onClose }: any) {
           ) : <div style={{ fontSize: 12, color: 'var(--muted)' }}>Publish this page to unlock ranking data</div>}
         </div>
       </div>
+
       {node.status === 'broken' && (
         <div style={{ background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.3)', borderRadius: 8, padding: 12 }}>
           <div style={{ fontSize: 12, color: '#ff5050', fontWeight: 700, marginBottom: 4 }}>⚠ Broken Internal Link</div>
@@ -142,7 +271,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
     return nodes.filter((n: any) => n.parent === parentId);
   }
 
-  const typeOrder = ['home', 'silo', 'category', 'post', 'product-cat', 'product'];
+  const typeOrder = ['home', 'silo', 'category', 'post', 'sa-post', 'page', 'location-page', 'product-cat', 'product'];
 
   function renderNode(node: any, depth: number = 0): any {
     const color = NODE_COLORS[node.type] || '#888';
@@ -183,7 +312,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
               {node.url && <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{node.url}</div>}
             </div>
             <PosBadge pos={node.position} />
-            {(node.traffic || 0) > 0 && <span style={{ fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{(node.traffic || 0).toLocaleString()}/mo</span>}
+            {(node.traffic || 0) > 0 && <span style={{ fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{(node.traffic || 0).toLocaleString()} visits/mo</span>}
           </div>
           <button onClick={(e) => toggleWorking(node.id || node.nodeId, e)} title="Toggle In Progress"
             style={{ background: isWorking ? 'rgba(168,207,69,0.15)' : 'rgba(255,255,255,0.04)',
@@ -235,7 +364,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
             <div><label className="form-label">Page Name *</label><input className="form-input" placeholder="e.g. Wax Strips" value={addForm.label} onChange={e => setAddForm(f => ({ ...f, label: e.target.value }))} /></div>
             <div><label className="form-label">URL</label><input className="form-input" placeholder="/waxing/wax-strips/" value={addForm.url} onChange={e => setAddForm(f => ({ ...f, url: e.target.value }))} /></div>
             <div><label className="form-label">Type</label><select className="form-input" value={addForm.type} onChange={e => setAddForm(f => ({ ...f, type: e.target.value }))}>
-              {['silo', 'category', 'post', 'product-cat', 'product'].map(t => <option key={t} value={t}>{t}</option>)}
+              {ALL_TYPES.map(t => <option key={t} value={t}>{NODE_TYPE_LABELS[t] || t}</option>)}
             </select></div>
             <div><label className="form-label">Silo</label><input className="form-input" placeholder="e.g. Waxing" value={addForm.silo} onChange={e => setAddForm(f => ({ ...f, silo: e.target.value }))} /></div>
             <div><label className="form-label">Parent Page</label>
@@ -256,7 +385,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
         {rootNodes.map((n: any) => renderNode(n, 0))}
       </div>
 
-      {selectedNode && <NodeDetailPanel node={selectedNode} keywords={keywords} onClose={() => setSelectedNode(null)} />}
+      {selectedNode && <NodeDetailPanel node={selectedNode} keywords={keywords} nodes={nodes} onClose={() => setSelectedNode(null)} onRefresh={onRefresh} />}
     </div>
   );
 }
