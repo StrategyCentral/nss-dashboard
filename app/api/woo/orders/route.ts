@@ -111,6 +111,14 @@ export async function GET(req: NextRequest) {
       channelData[channel].orders += 1;
       channelData[channel].items += (order.line_items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
 
+      // Track campaign breakdown within channel
+      const campaignKey = campaign || source || 'Unknown';
+      if (!channelData[channel].campaigns) channelData[channel].campaigns = {};
+      if (!channelData[channel].campaigns[campaignKey]) channelData[channel].campaigns[campaignKey] = { name: campaignKey, revenue: 0, profit: 0, orders: 0 };
+      channelData[channel].campaigns[campaignKey].revenue += orderTotal;
+      channelData[channel].campaigns[campaignKey].profit += orderProfit;
+      channelData[channel].campaigns[campaignKey].orders += 1;
+
       orderList.push({
         id: order.id,
         date: order.date_created,
@@ -135,6 +143,13 @@ export async function GET(req: NextRequest) {
         profit: parseFloat(c.profit.toFixed(2)),
         margin_pct: c.revenue > 0 ? parseFloat(((c.profit / c.revenue) * 100).toFixed(1)) : 0,
         revenue_pct: totalRevenue > 0 ? parseFloat(((c.revenue / totalRevenue) * 100).toFixed(1)) : 0,
+        cost_per_sale: c.orders > 0 ? 0 : 0, // No ad spend in WC data — placeholder
+        campaigns: Object.values(c.campaigns || {}).map((cam: any) => ({
+          ...cam,
+          revenue: parseFloat(cam.revenue.toFixed(2)),
+          profit: parseFloat(cam.profit.toFixed(2)),
+          margin_pct: cam.revenue > 0 ? parseFloat(((cam.profit / cam.revenue) * 100).toFixed(1)) : 0,
+        })).sort((a: any, b: any) => b.revenue - a.revenue),
       }))
       .sort((a, b) => b.revenue - a.revenue);
 
