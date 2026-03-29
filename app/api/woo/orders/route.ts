@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     } catch {}
 
     // Process orders
-    const channelData: Record<string, { channel: string; color: string; icon: string; revenue: number; profit: number; orders: number; items: number }> = {};
+    const channelData: Record<string, { channel: string; color: string; icon: string; revenue: number; profit: number; orders: number; items: number; campaigns: Record<string, any> }> = {};
     const orderList: any[] = [];
     let totalRevenue = 0;
     let totalProfit = 0;
@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
       totalProfit += orderProfit;
 
       // Aggregate by channel
-      if (!channelData[channel]) channelData[channel] = { channel, color, icon, revenue: 0, profit: 0, orders: 0, items: 0 };
+      if (!channelData[channel]) channelData[channel] = { channel, color, icon, revenue: 0, profit: 0, orders: 0, items: 0, campaigns: {} };
       channelData[channel].revenue += orderTotal;
       channelData[channel].profit += orderProfit;
       channelData[channel].orders += 1;
