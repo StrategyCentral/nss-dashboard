@@ -73,6 +73,18 @@ export async function GET(req: NextRequest) {
     const globalDefaultRow = db.prepare("SELECT key_value FROM api_keys WHERE service = 'default_margin'").get() as any;
     const defaultMargin = globalDefaultRow ? parseFloat(globalDefaultRow.key_value) : DEFAULT_MARGIN;
 
+    // Load attribution overrides from DB
+    let overrideMap = new Map<number, any>();
+    try {
+      db.exec(`CREATE TABLE IF NOT EXISTS attribution_overrides (
+        order_id INTEGER PRIMARY KEY, utm_source TEXT, utm_medium TEXT,
+        utm_campaign TEXT, utm_content TEXT, utm_term TEXT, channel TEXT,
+        override_reason TEXT, updated_at TEXT DEFAULT (datetime('now'))
+      )`);
+      const overrides = db.prepare('SELECT * FROM attribution_overrides').all() as any[];
+      overrideMap = new Map(overrides.map((o: any) => [o.order_id, o]));
+    } catch {}
+
     // Process orders
     const channelData: Record<string, { channel: string; color: string; icon: string; revenue: number; profit: number; orders: number; items: number }> = {};
     const orderList: any[] = [];
@@ -80,11 +92,25 @@ export async function GET(req: NextRequest) {
     let totalProfit = 0;
 
     for (const order of orders) {
-      const source = getMeta(order, '_wc_order_attribution_utm_source');
-      const medium = getMeta(order, '_wc_order_attribution_utm_medium');
-      const campaign = getMeta(order, '_wc_order_attribution_utm_campaign');
+      let source = getMeta(order, '_wc_order_attribution_utm_source');
+      let medium = getMeta(order, '_wc_order_attribution_utm_medium');
+      let campaign = getMeta(order, '_wc_order_attribution_utm_campaign');
       const referrer = getMeta(order, '_wc_order_attribution_referrer');
-      const { channel, color, icon } = mapChannel(source, medium, campaign, referrer);
+
+      // Apply override if exists
+      const override = overrideMap.get(order.id);
+      if (override) {
+        if (override.utm_source) source = override.utm_source;
+        if (override.utm_medium) medium = override.utm_medium;
+        if (override.utm_campaign) campaign = override.utm_campaign;
+      }
+
+      // Fix ig source → Instagram
+      if (source === 'ig') { source = 'instagram'; medium = 'paid'; }
+
+      const { channel, color, icon } = override?.channel
+        ? { channel: override.channel, color: override.channel.includes('Google') ? '#4285F4' : override.channel.includes('Instagram') ? '#E1306C' : override.channel.includes('Facebook') ? '#1877F2' : '#888', icon: override.channel.includes('Google') ? '📢' : override.channel.includes('Instagram') ? '📸' : '🌐' }
+        : mapChannel(source, medium, campaign, referrer);
 
       const orderTotal = parseFloat(order.total || '0');
 
