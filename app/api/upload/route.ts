@@ -43,6 +43,165 @@ function g(row: Record<string, string>, ...keys: string[]): string {
 
 function n(val: string): number { return parseFloat(val.replace(/[^0-9.]/g, '') || '0') || 0; }
 
+// Detect if this is a combined granular export (Campaign+Adset+Ad+Day+Age+Gender all in one)
+function isCombinedGranular(headers: string[]): boolean {
+  const h = headers.map(k => k.toLowerCase().replace(/['"]/g, '').trim());
+  return (
+    h.some(k => k === 'day') &&
+    h.some(k => k === 'age') &&
+    h.some(k => k === 'gender') &&
+    h.some(k => k.includes('campaign name') || k === 'campaign name') &&
+    h.some(k => k.includes('ad set name') || k.includes('adset name')) &&
+    h.some(k => k === 'ad name' || k === 'ad')
+  );
+}
+
+function parseCombinedGranular(rows: Record<string, string>[]) {
+  // Filter out summary rows (empty campaign name) and rows without a valid date
+  const dataRows = rows.filter(r => {
+    const campaign = g(r, 'Campaign name', 'Campaign');
+    const day = r['Day'] || r['day'] || '';
+    return campaign && day && /^\d{4}-\d{2}-\d{2}$/.test(day);
+  });
+
+  const campaigns: Record<string, any> = {};
+  const dailyMap: Record<string, { date: string; spend: number; conversions: number; clicks: number; impressions: number }> = {};
+  const ageMap: Record<string, { age: string; spend: number; conversions: number; clicks: number }> = {};
+  const genderMap: Record<string, { gender: string; spend: number; conversions: number }> = {};
+  const adMap: Record<string, { name: string; campaign: string; adset: string; spend: number; conversions: number; clicks: number; impressions: number }> = {};
+
+  for (const row of dataRows) {
+    const campaignName = g(row, 'Campaign name', 'Campaign');
+    const adsetName = g(row, 'Ad Set Name', 'Ad set name', 'Adset');
+    const adName = g(row, 'Ad Name', 'Ad name');
+    const day = row['Day'] || '';
+    const age = row['Age'] || row['age'] || '';
+    const gender = (row['Gender'] || row['gender'] || '').toLowerCase();
+    const spend = n(g(row, 'Amount spent', 'Spend'));
+    const isPurchase = (row['Result type'] || '').toLowerCase().includes('purchase');
+    const purchases = isPurchase ? n(row['Results'] || '0') : 0;
+    const clicks = n(g(row, 'Link clicks', 'Clicks'));
+    const impressions = n(g(row, 'Impressions'));
+
+    // Campaigns
+    if (!campaigns[campaignName]) campaigns[campaignName] = { name: campaignName, spend: 0, conversions: 0, clicks: 0, impressions: 0, revenue: 0, roas: 0, cpc: 0, ctr: 0, cpa: 0, adsets: {} };
+    campaigns[campaignName].spend += spend;
+    campaigns[campaignName].conversions += purchases;
+    campaigns[campaignName].clicks += clicks;
+    campaigns[campaignName].impressions += impressions;
+
+    // Adsets
+    if (!campaigns[campaignName].adsets[adsetName]) campaigns[campaignName].adsets[adsetName] = { name: adsetName, campaign: campaignName, spend: 0, conversions: 0, clicks: 0, impressions: 0, revenue: 0, roas: 0, cpc: 0, ctr: 0, cpa: 0, ads: {} };
+    campaigns[campaignName].adsets[adsetName].spend += spend;
+    campaigns[campaignName].adsets[adsetName].conversions += purchases;
+    campaigns[campaignName].adsets[adsetName].clicks += clicks;
+    campaigns[campaignName].adsets[adsetName].impressions += impressions;
+
+    // Ads
+    const adKey = `${campaignName}||${adsetName}||${adName}`;
+    if (!campaigns[campaignName].adsets[adsetName].ads[adKey]) campaigns[campaignName].adsets[adsetName].ads[adKey] = { name: adName, campaign: campaignName, adset: adsetName, spend: 0, conversions: 0, clicks: 0, impressions: 0, revenue: 0, roas: 0, cpc: 0, ctr: 0, cpa: 0 };
+    campaigns[campaignName].adsets[adsetName].ads[adKey].spend += spend;
+    campaigns[campaignName].adsets[adsetName].ads[adKey].conversions += purchases;
+    campaigns[campaignName].adsets[adsetName].ads[adKey].clicks += clicks;
+    campaigns[campaignName].adsets[adsetName].ads[adKey].impressions += impressions;
+
+    // Daily
+    if (day) {
+      if (!dailyMap[day]) dailyMap[day] = { date: day, spend: 0, conversions: 0, clicks: 0, impressions: 0 };
+      dailyMap[day].spend += spend;
+      dailyMap[day].conversions += purchases;
+      dailyMap[day].clicks += clicks;
+      dailyMap[day].impressions += impressions;
+    }
+
+    // Age (skip unknown/empty)
+    if (age && age.toLowerCase() !== 'unknown' && age !== '') {
+      if (!ageMap[age]) ageMap[age] = { age, spend: 0, conversions: 0, clicks: 0 };
+      ageMap[age].spend += spend;
+      ageMap[age].conversions += purchases;
+      ageMap[age].clicks += clicks;
+    }
+
+    // Gender (skip unknown/empty)
+    if (gender && gender !== 'unknown' && gender !== '') {
+      if (!genderMap[gender]) genderMap[gender] = { gender, spend: 0, conversions: 0 };
+      genderMap[gender].spend += spend;
+      genderMap[gender].conversions += purchases;
+    }
+
+    // Ad flat breakdown
+    if (!adMap[adKey]) adMap[adKey] = { name: adName, campaign: campaignName, adset: adsetName, spend: 0, conversions: 0, clicks: 0, impressions: 0 };
+    adMap[adKey].spend += spend;
+    adMap[adKey].conversions += purchases;
+    adMap[adKey].clicks += clicks;
+    adMap[adKey].impressions += impressions;
+  }
+
+  const calc = (obj: any) => {
+    obj.roas = 0; obj.revenue = 0;
+    obj.cpc = obj.clicks > 0 ? parseFloat((obj.spend / obj.clicks).toFixed(2)) : 0;
+    obj.ctr = obj.impressions > 0 ? parseFloat(((obj.clicks / obj.impressions) * 100).toFixed(2)) : 0;
+    obj.cpa = obj.conversions > 0 ? parseFloat((obj.spend / obj.conversions).toFixed(2)) : 0;
+    obj.spend = parseFloat(obj.spend.toFixed(2));
+  };
+
+  const campaignsArr = Object.values(campaigns).map((c: any) => {
+    calc(c);
+    c.adsets = Object.values(c.adsets).map((a: any) => {
+      calc(a);
+      a.ads = Object.values(a.ads).map((d: any) => { calc(d); return d; });
+      return a;
+    });
+    return c;
+  }).sort((a: any, b: any) => b.spend - a.spend);
+
+  const totals = campaignsArr.reduce((acc: any, c: any) => ({
+    spend: acc.spend + c.spend, conversions: acc.conversions + c.conversions,
+    clicks: acc.clicks + c.clicks, impressions: acc.impressions + c.impressions,
+  }), { spend: 0, conversions: 0, clicks: 0, impressions: 0 });
+
+  const daily = Object.values(dailyMap)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(d => ({ ...d, spend: parseFloat(d.spend.toFixed(2)) }));
+
+  const dates = daily.map(d => d.date);
+  const dateRange = dates.length > 0 ? { start: dates[0], end: dates[dates.length - 1] } : { start: '', end: '' };
+
+  const ageOrder = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
+  const ageBreakdown = ageOrder.filter(a => ageMap[a]).map(a => {
+    const d = ageMap[a];
+    return { age: a, spend: parseFloat(d.spend.toFixed(2)), conversions: d.conversions, clicks: d.clicks,
+      cpa: d.conversions > 0 ? parseFloat((d.spend / d.conversions).toFixed(2)) : 0,
+      pct: totals.spend > 0 ? parseFloat(((d.spend / totals.spend) * 100).toFixed(1)) : 0 };
+  });
+
+  const totalGenderSpend = Object.values(genderMap).reduce((s: number, g: any) => s + g.spend, 0);
+  const genderBreakdown = Object.values(genderMap).map((d: any) => ({
+    gender: d.gender, spend: parseFloat(d.spend.toFixed(2)), conversions: d.conversions,
+    pct: totalGenderSpend > 0 ? parseFloat(((d.spend / totalGenderSpend) * 100).toFixed(1)) : 0,
+  })).sort((a: any, b: any) => b.spend - a.spend);
+
+  const adBreakdown = Object.values(adMap).map((d: any) => ({
+    name: d.name, campaign: d.campaign, adset: d.adset,
+    spend: parseFloat(d.spend.toFixed(2)), conversions: d.conversions, clicks: d.clicks,
+    cpa: d.conversions > 0 ? parseFloat((d.spend / d.conversions).toFixed(2)) : 0,
+    ctr: d.impressions > 0 ? parseFloat(((d.clicks / d.impressions) * 100).toFixed(2)) : 0,
+  })).sort((a, b) => b.spend - a.spend);
+
+  return {
+    format: 'combined_granular', dateRange,
+    spend: parseFloat(totals.spend.toFixed(2)), conversions: totals.conversions,
+    clicks: totals.clicks, impressions: totals.impressions,
+    roas: 0, revenue: 0,
+    cpc: totals.clicks > 0 ? parseFloat((totals.spend / totals.clicks).toFixed(2)) : 0,
+    cpa: totals.conversions > 0 ? parseFloat((totals.spend / totals.conversions).toFixed(2)) : 0,
+    campaigns: campaignsArr, monthly: [], daily,
+    ageBreakdown, genderBreakdown, adBreakdown,
+    level: 'ad', reportType: 'combined_granular',
+    uploadedAt: new Date().toISOString(),
+  };
+}
+
 // Detect what type of Meta export this is
 function detectMetaReportType(rows: Record<string, string>[], headers: string[]): { level: string; reportType: string } {
   const h = headers.map(k => k.toLowerCase());
@@ -239,22 +398,33 @@ export async function POST(req: NextRequest) {
   if (rows.length === 0) return NextResponse.json({ error: 'Could not parse CSV — check file format' }, { status: 400 });
 
   const headers = Object.keys(rows[0]);
-  const { level, reportType } = detectMetaReportType(rows, headers);
 
   let parsed: any;
-  let dataLevel = level;
+  let dataLevel: string;
+  let reportType: string;
 
-  if (reportType === 'performance') {
-    const perfRows = parseMetaPerformance(rows);
-    if (perfRows.length === 0) return NextResponse.json({ error: 'No ad data found — check the file has spend data' }, { status: 400 });
-    parsed = aggregatePerformance(perfRows, level);
-    dataLevel = level;
+  // Check for combined granular format first (has Day+Age+Gender+Campaign+Adset+Ad)
+  if (isCombinedGranular(headers)) {
+    parsed = parseCombinedGranular(rows);
+    dataLevel = 'ad';
+    reportType = 'combined_granular';
+    if (!parsed.campaigns?.length) return NextResponse.json({ error: 'No campaign data found — check the file has spend data' }, { status: 400 });
   } else {
-    // Breakdown report
-    const bdRows = parseMetaBreakdown(rows, reportType);
-    if (bdRows.length === 0) return NextResponse.json({ error: 'No breakdown data found' }, { status: 400 });
-    parsed = aggregateBreakdown(bdRows, reportType, level);
-    dataLevel = `${level}_${reportType}`;
+    const detected = detectMetaReportType(rows, headers);
+    dataLevel = detected.level;
+    reportType = detected.reportType;
+
+    if (reportType === 'performance') {
+      const perfRows = parseMetaPerformance(rows);
+      if (perfRows.length === 0) return NextResponse.json({ error: 'No ad data found — check the file has spend data' }, { status: 400 });
+      parsed = aggregatePerformance(perfRows, detected.level);
+      dataLevel = detected.level;
+    } else {
+      const bdRows = parseMetaBreakdown(rows, reportType);
+      if (bdRows.length === 0) return NextResponse.json({ error: 'No breakdown data found' }, { status: 400 });
+      parsed = aggregateBreakdown(bdRows, reportType, detected.level);
+      dataLevel = `${detected.level}_${reportType}`;
+    }
   }
 
   try {
@@ -265,9 +435,11 @@ export async function POST(req: NextRequest) {
     );
   } catch (e: any) { console.error('DB save:', e.message); }
 
-  const summary = reportType === 'performance'
-    ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, revenue: parsed.revenue, roas: parsed.roas, purchases: parsed.conversions }
-    : { dimensions: parsed.dimensions?.length || 0, breakdownType: reportType };
+  const summary = reportType === 'combined_granular'
+    ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, purchases: parsed.conversions, cpa: parsed.cpa, dateRange: parsed.dateRange }
+    : reportType === 'performance'
+      ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, revenue: parsed.revenue, roas: parsed.roas, purchases: parsed.conversions }
+      : { dimensions: parsed.dimensions?.length || 0, breakdownType: reportType };
 
   return NextResponse.json({ ok: true, platform, level: dataLevel, reportType, ...summary, uploadedAt: parsed.uploadedAt });
 }
