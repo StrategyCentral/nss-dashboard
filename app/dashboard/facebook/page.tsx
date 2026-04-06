@@ -327,6 +327,142 @@ function AdsetDetailView({ adsetName, ageBreakdown, genderBreakdown }: { adsetNa
   );
 }
 
+
+// ── Lifetime Per-Ad Performance ───────────────────────────────────────────────
+function LifetimePerformance({ data }: { data: any }) {
+  const [showAll, setShowAll] = useState(false);
+  const ads = showAll ? data.ads : data.ads.slice(0, 10);
+  const maxSpend = Math.max(...data.ads.map((a: any) => a.spend), 1);
+  const maxRoas = Math.max(...data.ads.map((a: any) => a.roas), 1);
+
+  const adsetColors: Record<string, string> = {
+    'Beauty Supplies General': '#E7258D',
+    'Lashes': '#04AAE8',
+    'Waxing': '#FFCC2A',
+    'Tanning': '#A8CF45',
+    'Nails': '#ff8c42',
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+          📅 All Time Performance — NSS ONGOING - Bully
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+          {data.reportingStart} → {data.reportingEnd} · {data.ads.length} ads · Lifetime totals
+        </div>
+      </div>
+
+      {/* Lifetime KPIs */}
+      <div className="stats-grid" style={{ marginBottom: 20 }}>
+        {[
+          { label: 'Total Spend', value: `$${Math.round(data.spend).toLocaleString()}`, color: 'var(--pink)' },
+          { label: 'Revenue (Meta)', value: `$${Math.round(data.revenue).toLocaleString()}`, color: 'var(--green)' },
+          { label: 'ROAS', value: `${data.roas?.toFixed(1)}×`, color: 'var(--yellow)' },
+          { label: 'Purchases', value: data.purchases?.toLocaleString(), color: 'var(--blue)' },
+          { label: 'CPA', value: `$${data.cpa?.toFixed(2)}`, color: 'var(--pink)' },
+          { label: 'ATC → Purchase', value: `${data.atcToPurchaseRate}%`, color: '#a8cf45' },
+        ].map(t => (
+          <div key={t.label} className="stat-tile">
+            <span className="label">{t.label}</span>
+            <span className="value" style={{ color: t.color }}>{t.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Adset/Category breakdown */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16 }}>📂 Category Breakdown</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+          {data.adsets.map((a: any) => {
+            const color = adsetColors[a.name] || '#888';
+            return (
+              <div key={a.name} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${color}30`, borderRadius: 10, padding: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 10 }}>{a.name}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {[
+                    { l: 'Spend', v: `$${Math.round(a.spend).toLocaleString()}` },
+                    { l: 'Purchases', v: a.purchases?.toLocaleString() },
+                    { l: 'ROAS', v: `${a.roas?.toFixed(1)}×` },
+                    { l: 'CPA', v: `$${a.cpa?.toFixed(2)}` },
+                    { l: 'ATC Rate', v: `${a.atcRate}%` },
+                    { l: 'Ads', v: a.adCount },
+                  ].map(m => (
+                    <div key={m.l}>
+                      <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.l}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{m.v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Ad performance table */}
+      <div className="card" style={{ padding: 0 }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>🖼 Ad Performance — Full Funnel</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>{data.ads.length} ads total</div>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['Ad', 'Category', 'Spend', 'Bar', 'ROAS', 'Purchases', 'CPA', 'ATC', 'ATC→Checkout', 'Checkout→Buy', 'Freq'].map(h => (
+                  <th key={h} style={{ padding: '8px 10px', textAlign: h === 'Ad' || h === 'Category' ? 'left' : 'right', fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ads.map((ad: any, i: number) => {
+                const color = adsetColors[ad.adset] || '#888';
+                const roasColor = ad.roas >= 120 ? '#a8cf45' : ad.roas >= 100 ? '#ffe600' : '#ff8c42';
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <td style={{ padding: '9px 10px', fontWeight: 600, maxWidth: 160 }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.name}</div>
+                    </td>
+                    <td style={{ padding: '9px 10px' }}>
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: `${color}20`, color }}>{ad.adset}</span>
+                    </td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--pink)' }}>${Math.round(ad.spend).toLocaleString()}</td>
+                    <td style={{ padding: '9px 10px', width: 70 }}>
+                      <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${(ad.spend / maxSpend) * 100}%`, background: 'var(--pink)', borderRadius: 2 }} />
+                      </div>
+                    </td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 800, color: roasColor }}>{ad.roas > 0 ? `${ad.roas.toFixed(0)}×` : '—'}</td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', color: '#04aae8', fontWeight: 700 }}>{ad.purchases?.toLocaleString()}</td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', color: ad.cpa < 3 ? '#a8cf45' : 'var(--muted)' }}>{ad.cpa > 0 ? `$${ad.cpa.toFixed(2)}` : '—'}</td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--muted)' }}>{ad.atc?.toLocaleString()}</td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', color: ad.checkoutRate > 15 ? '#a8cf45' : 'var(--muted)' }}>{ad.checkoutRate > 0 ? `${ad.checkoutRate}%` : '—'}</td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', color: ad.purchaseRate > 70 ? '#a8cf45' : 'var(--muted)' }}>{ad.purchaseRate > 0 ? `${ad.purchaseRate}%` : '—'}</td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', color: ad.frequency > 15 ? '#ff8c42' : 'var(--muted)' }}>{ad.frequency > 0 ? ad.frequency.toFixed(1) : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {data.ads.length > 10 && (
+          <div style={{ padding: '10px 16px', textAlign: 'center' }}>
+            <button onClick={() => setShowAll(!showAll)} className="btn btn-ghost" style={{ fontSize: 11 }}>
+              {showAll ? '▲ Show less' : `▼ Show all ${data.ads.length} ads`}
+            </button>
+          </div>
+        )}
+        <div style={{ padding: '10px 16px', fontSize: 10, color: 'var(--muted)', borderTop: '1px solid var(--border)' }}>
+          ROAS = Meta-attributed revenue ÷ spend · Frequency = avg times each person saw the ad · ATC Rate = add-to-cart per link click
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Export ───────────────────────────────────────────────────────────────
 export default function FacebookPage() {
   const router = useRouter();
@@ -340,8 +476,9 @@ export default function FacebookPage() {
   const [showUtmBanner, setShowUtmBanner] = useState(true);
   const [wooDaily, setWooDaily] = useState<any[]>([]);
   const [wooTotals, setWooTotals] = useState({ revenue: 0, orders: 0 });
-  const [activeTab, setActiveTab] = useState<'overview' | 'demographics' | 'ads'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'demographics' | 'ads' | 'alltime'>('overview');
   const [periods, setPeriods] = useState<string[]>([]);
+  const [lifetimeData, setLifetimeData] = useState<any>(null);
 
   async function load() {
     try {
@@ -364,6 +501,13 @@ export default function FacebookPage() {
         setWooDaily(wd.daily || []);
         setWooTotals({ revenue: wd.totalRevenue || 0, orders: wd.totalOrders || 0 });
       } catch {}
+    } catch {}
+
+    // Load lifetime per-ad data
+    try {
+      const lr = await fetch('/api/data/facebook?type=lifetime');
+      const ld = await lr.json();
+      if (ld.data) setLifetimeData(ld.data);
     } catch {}
   }
 
@@ -451,9 +595,13 @@ export default function FacebookPage() {
       </div>
 
       {/* Tab bar — only when combined data */}
-      {isCombined && (
+      {(isCombined || lifetimeData) && (
         <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
-          {([['overview', '📊 Overview'], ['demographics', '👥 Demographics'], ['ads', '🖼 Ads']] as const).map(([tab, label]) => (
+          {([
+            ['overview', '📊 Overview'],
+            ...(isCombined ? [['demographics', '👥 Demographics'], ['ads', '🖼 Ads']] : []),
+            ...(lifetimeData ? [['alltime', '📅 All Time']] : []),
+          ] as const).map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               style={{ padding: '8px 18px', fontSize: 13, fontWeight: activeTab === tab ? 700 : 500, background: 'none', border: 'none', cursor: 'pointer',
                 color: activeTab === tab ? 'var(--text)' : 'var(--muted)',
@@ -506,6 +654,11 @@ export default function FacebookPage() {
       {/* Ads tab */}
       {activeTab === 'ads' && isCombined && fbData?.adBreakdown?.length > 0 && (
         <AdBreakdownTable adBreakdown={fbData.adBreakdown} />
+      )}
+
+      {/* All Time tab */}
+      {activeTab === 'alltime' && lifetimeData && (
+        <LifetimePerformance data={lifetimeData} />
       )}
 
       <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 12 }}>

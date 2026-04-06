@@ -47,6 +47,111 @@ function g(row: Record<string, string>, ...keys: string[]): string {
 function n(val: string): number { return parseFloat(val.replace(/[^0-9.]/g, '') || '0') || 0; }
 
 // Detect if this is a combined granular export (Campaign+Adset+Ad+Day+Age+Gender all in one)
+
+// Detect lifetime/aggregated per-ad export (has Reporting starts/ends, no Day column)
+function isLifetimePerAd(headers: string[]): boolean {
+  const h = headers.map(k => k.toLowerCase().replace(/['"]/g, '').trim());
+  return (
+    h.some(k => k.includes('reporting starts')) &&
+    h.some(k => k.includes('reporting ends')) &&
+    !h.some(k => k === 'day') &&
+    !h.some(k => k === 'age') &&
+    h.some(k => k === 'ad name' || k === 'ad') &&
+    h.some(k => k.includes('amount spent'))
+  );
+}
+
+function parseLifetimePerAd(rows: Record<string, string>[]) {
+  const dataRows = rows.filter(r => {
+    const campaign = g(r, 'Campaign name', 'Campaign');
+    const spend = n(g(r, 'Amount spent', 'Spend'));
+    return campaign && spend > 0;
+  });
+
+  const reportingStart = dataRows[0] ? (dataRows[0]['Reporting starts'] || '') : '';
+  const reportingEnd = dataRows[0] ? (dataRows[0]['Reporting ends'] || '') : '';
+
+  // Group by adset (category breakdown)
+  const adsets: Record<string, any> = {};
+  const ads: any[] = [];
+
+  let totalSpend = 0, totalPurchases = 0, totalRevenue = 0;
+  let totalAtc = 0, totalCheckouts = 0, totalClicks = 0, totalImpressions = 0;
+
+  for (const row of dataRows) {
+    const adName = g(row, 'Ad Name', 'Ad name');
+    const adsetName = g(row, 'Ad Set Name', 'Ad set name', 'Adset');
+    const campaignName = g(row, 'Campaign name', 'Campaign');
+    const spend = n(g(row, 'Amount spent', 'Spend'));
+    const purchases = n(row['Purchases'] || row['Website purchases'] || '0');
+    const revenue = n(row['Purchases conversion value'] || row['Website purchase ROAS'] || '0');
+    const atc = n(row['Adds to cart'] || '0');
+    const checkouts = n(row['Checkouts initiated'] || '0');
+    const clicks = n(g(row, 'Link clicks', 'Clicks'));
+    const impressions = n(g(row, 'Impressions'));
+    const reach = n(row['Reach'] || '0');
+    const frequency = parseFloat(row['Frequency'] || '0') || 0;
+    const cpm = n(g(row, 'CPM'));
+    const ctr = n(g(row, 'CTR'));
+    const roas = revenue > 0 && spend > 0 ? parseFloat((revenue / spend).toFixed(2)) : 0;
+    const cpa = purchases > 0 && spend > 0 ? parseFloat((spend / purchases).toFixed(2)) : 0;
+    const cpc = clicks > 0 && spend > 0 ? parseFloat((spend / clicks).toFixed(2)) : 0;
+    const atcRate = clicks > 0 ? parseFloat(((atc / clicks) * 100).toFixed(1)) : 0;
+    const checkoutRate = atc > 0 ? parseFloat(((checkouts / atc) * 100).toFixed(1)) : 0;
+    const purchaseRate = checkouts > 0 ? parseFloat(((purchases / checkouts) * 100).toFixed(1)) : 0;
+
+    totalSpend += spend; totalPurchases += purchases; totalRevenue += revenue;
+    totalAtc += atc; totalCheckouts += checkouts; totalClicks += clicks; totalImpressions += impressions;
+
+    ads.push({
+      name: adName, adset: adsetName, campaign: campaignName,
+      spend: parseFloat(spend.toFixed(2)), purchases, revenue: parseFloat(revenue.toFixed(2)),
+      roas, cpa, cpc, atc, checkouts, clicks, impressions, reach, frequency, cpm, ctr,
+      atcRate, checkoutRate, purchaseRate,
+    });
+
+    if (!adsets[adsetName]) adsets[adsetName] = { name: adsetName, spend: 0, purchases: 0, revenue: 0, atc: 0, checkouts: 0, clicks: 0, impressions: 0, adCount: 0 };
+    adsets[adsetName].spend += spend;
+    adsets[adsetName].purchases += purchases;
+    adsets[adsetName].revenue += revenue;
+    adsets[adsetName].atc += atc;
+    adsets[adsetName].checkouts += checkouts;
+    adsets[adsetName].clicks += clicks;
+    adsets[adsetName].impressions += impressions;
+    adsets[adsetName].adCount += 1;
+  }
+
+  // Sort ads by spend desc
+  ads.sort((a, b) => b.spend - a.spend);
+
+  // Calculate adset derived metrics
+  const adsetsArr = Object.values(adsets).map((a: any) => ({
+    ...a,
+    spend: parseFloat(a.spend.toFixed(2)),
+    revenue: parseFloat(a.revenue.toFixed(2)),
+    roas: a.spend > 0 && a.revenue > 0 ? parseFloat((a.revenue / a.spend).toFixed(2)) : 0,
+    cpa: a.purchases > 0 ? parseFloat((a.spend / a.purchases).toFixed(2)) : 0,
+    cpc: a.clicks > 0 ? parseFloat((a.spend / a.clicks).toFixed(2)) : 0,
+    atcRate: a.clicks > 0 ? parseFloat(((a.atc / a.clicks) * 100).toFixed(1)) : 0,
+    checkoutRate: a.atc > 0 ? parseFloat(((a.checkouts / a.atc) * 100).toFixed(1)) : 0,
+  })).sort((a: any, b: any) => b.spend - a.spend);
+
+  return {
+    format: 'lifetime_per_ad',
+    reportingStart, reportingEnd,
+    spend: parseFloat(totalSpend.toFixed(2)),
+    purchases: totalPurchases,
+    revenue: parseFloat(totalRevenue.toFixed(2)),
+    roas: totalSpend > 0 && totalRevenue > 0 ? parseFloat((totalRevenue / totalSpend).toFixed(2)) : 0,
+    cpa: totalPurchases > 0 ? parseFloat((totalSpend / totalPurchases).toFixed(2)) : 0,
+    atc: totalAtc, checkouts: totalCheckouts, clicks: totalClicks, impressions: totalImpressions,
+    atcToPurchaseRate: totalAtc > 0 ? parseFloat(((totalPurchases / totalAtc) * 100).toFixed(1)) : 0,
+    ads, adsets: adsetsArr,
+    level: 'ad', reportType: 'lifetime_per_ad',
+    uploadedAt: new Date().toISOString(),
+  };
+}
+
 function isCombinedGranular(headers: string[]): boolean {
   const h = headers.map(k => k.toLowerCase().replace(/['"]/g, '').trim());
   return (
@@ -406,8 +511,15 @@ export async function POST(req: NextRequest) {
   let dataLevel: string;
   let reportType: string;
 
-  // Check for combined granular format first (has Day+Age+Gender+Campaign+Adset+Ad)
-  if (isCombinedGranular(headers)) {
+  // Check for lifetime per-ad format first (has Reporting starts/ends, no Day column)
+  if (isLifetimePerAd(headers)) {
+    parsed = parseLifetimePerAd(rows);
+    dataLevel = 'ad';
+    reportType = 'lifetime_per_ad';
+    if (!parsed.ads?.length) return NextResponse.json({ error: 'No ad data found' }, { status: 400 });
+  }
+  // Check for combined granular format (has Day+Age+Gender+Campaign+Adset+Ad)
+  else if (isCombinedGranular(headers)) {
     parsed = parseCombinedGranular(rows);
     dataLevel = 'ad';
     reportType = 'combined_granular';
@@ -447,11 +559,13 @@ export async function POST(req: NextRequest) {
     );
   } catch (e: any) { console.error('DB save:', e.message); }
 
-  const summary = reportType === 'combined_granular'
-    ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, purchases: parsed.conversions, cpa: parsed.cpa, dateRange: parsed.dateRange, period }
-    : reportType === 'performance'
-      ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, revenue: parsed.revenue, roas: parsed.roas, purchases: parsed.conversions, period }
-      : { dimensions: parsed.dimensions?.length || 0, breakdownType: reportType, period };
+  const summary = reportType === 'lifetime_per_ad'
+    ? { ads: parsed.ads?.length || 0, spend: parsed.spend, revenue: parsed.revenue, roas: parsed.roas, purchases: parsed.purchases, cpa: parsed.cpa, period, reportingStart: parsed.reportingStart, reportingEnd: parsed.reportingEnd }
+    : reportType === 'combined_granular'
+      ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, purchases: parsed.conversions, cpa: parsed.cpa, dateRange: parsed.dateRange, period }
+      : reportType === 'performance'
+        ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, revenue: parsed.revenue, roas: parsed.roas, purchases: parsed.conversions, period }
+        : { dimensions: parsed.dimensions?.length || 0, breakdownType: reportType, period };
 
   return NextResponse.json({ ok: true, platform, level: dataLevel, reportType, ...summary, uploadedAt: parsed.uploadedAt });
 }

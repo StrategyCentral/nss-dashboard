@@ -42,9 +42,21 @@ async function fetchMetaAds(token: string) {
   };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Lifetime data request
+  const url = new URL(req.url);
+  if (url.searchParams.get('type') === 'lifetime') {
+    try {
+      const { getDb } = require('@/lib/db');
+      const db = getDb();
+      const row = db.prepare("SELECT data, filename, uploaded_at FROM uploaded_data WHERE platform = 'facebook' AND report_type = 'lifetime_per_ad' ORDER BY uploaded_at DESC LIMIT 1").get() as any;
+      if (row?.data) return NextResponse.json({ data: JSON.parse(row.data), source: 'upload', filename: row.filename, uploadedAt: row.uploaded_at });
+    } catch {}
+    return NextResponse.json({ data: null });
+  }
 
   // 1. Try live API token
   try {
