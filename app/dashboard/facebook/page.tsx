@@ -341,6 +341,7 @@ export default function FacebookPage() {
   const [wooDaily, setWooDaily] = useState<any[]>([]);
   const [wooTotals, setWooTotals] = useState({ revenue: 0, orders: 0 });
   const [activeTab, setActiveTab] = useState<'overview' | 'demographics' | 'ads'>('overview');
+  const [periods, setPeriods] = useState<string[]>([]);
 
   async function load() {
     try {
@@ -351,6 +352,7 @@ export default function FacebookPage() {
       setFilename(d.filename || '');
       setUploadedAt(d.uploadedAt || '');
       setLevel(d.data?.level || 'campaign');
+      setPeriods(d.periods || []);
 
       // Load WooCommerce daily aligned to the CSV date range
       const dr = d.data?.dateRange;
@@ -372,7 +374,9 @@ export default function FacebookPage() {
   if (currentAdset) return <AdsetDetailView adsetName={currentAdset} ageBreakdown={fbData?.ageBreakdown} genderBreakdown={fbData?.genderBreakdown} />;
 
   const isCombined = fbData?.format === 'combined_granular';
-  const campaigns = fbData?.campaigns?.length ? fbData.campaigns : FB_DEMO_CAMPAIGNS;
+  // Filter out summary/invalid rows (empty name, "0", or no spend)
+  const rawCampaigns = fbData?.campaigns?.length ? fbData.campaigns : FB_DEMO_CAMPAIGNS;
+  const campaigns = rawCampaigns.filter((c: any) => c.name && c.name !== '0' && c.name.trim() !== '' && c.spend > 0);
   const isDemo = source === 'demo' || !fbData?.campaigns?.length;
 
   const totals = isDemo
@@ -394,8 +398,8 @@ export default function FacebookPage() {
         <div>
           <h1 className="section-title" style={{ fontSize: 26 }}>Facebook Ads</h1>
           <p className="section-sub">
-            {isCombined && fbData?.dateRange
-              ? `${fbData.dateRange.start} → ${fbData.dateRange.end} · Campaign + demographics + daily breakdown`
+            {isCombined && periods.length > 0
+              ? `${periods.length} month${periods.length > 1 ? 's' : ''} loaded: ${periods.join(', ')} · Campaign + demographics + daily`
               : 'Campaign → Adset → Ad with demographics, device & time breakdown'}
           </p>
         </div>
@@ -526,8 +530,8 @@ function UploadPanelInline({ existingFile, existingDate, existingLevel, isCombin
       const d = await r.json();
       if (!r.ok) setError(d.error || 'Upload failed');
       else if (d.reportType === 'combined_granular') {
-        const dr = d.dateRange ? ` · ${d.dateRange.start} → ${d.dateRange.end}` : '';
-        setSuccess(`✓ Combined granular · ${d.campaigns} campaigns · $${Math.round(d.spend || 0)} spend · ${d.purchases} purchases · CPA $${(d.cpa || 0).toFixed(2)}${dr}`);
+        const periodLabel = d.period ? ` · Period: ${d.period}` : '';
+        setSuccess(`✓ ${d.period || 'Month'} saved · ${d.campaigns} campaigns · $${Math.round(d.spend || 0)} spend · ${d.purchases} purchases · CPA $${(d.cpa || 0).toFixed(2)}${periodLabel}`);
         onUploaded();
       } else {
         setSuccess(`✓ ${d.level}-level · ${d.campaigns} campaigns · $${Math.round(d.spend || 0)} spend`);
@@ -553,6 +557,9 @@ function UploadPanelInline({ existingFile, existingDate, existingLevel, isCombin
       </div>
       {error && <div style={{ marginTop: 8, fontSize: 11, color: '#ff5050' }}>⚠ {error}</div>}
       {success && <div style={{ marginTop: 8, fontSize: 11, color: '#a8cf45' }}>{success}</div>}
+      <div style={{ marginTop: 12, fontSize: 11, color: 'var(--muted)' }}>
+        <strong style={{ color: 'var(--text)' }}>How it works:</strong> Each CSV is stored by month — upload multiple months and they stack up automatically. Upload the same month again to replace it.
+      </div>
     </div>
   );
 }
@@ -580,11 +587,11 @@ function CampaignRowComp({ campaign, onViewAdset, isCombined }: any) {
             <span key="ct" style={{ fontSize: 12, color: 'var(--muted)' }}>{campaign.ctr > 0 ? `${campaign.ctr}%` : '—'}</span>,
           ] : [
             { v: fmt(campaign.spend) },
-            { v: fmt(campaign.revenue), c: 'var(--green)' },
-            { v: null, roas: campaign.roas },
-            { v: campaign.conversions },
-            { v: `$${campaign.cpc}` },
-            { v: `${campaign.ctr}%` },
+            { v: campaign.revenue > 0 ? fmt(campaign.revenue) : '—', c: 'var(--green)' },
+            { v: null, roas: campaign.roas || 0 },
+            { v: campaign.conversions ?? '—' },
+            { v: campaign.cpc > 0 ? `$${campaign.cpc}` : '—' },
+            { v: campaign.ctr > 0 ? `${campaign.ctr}%` : '—' },
           ].map((m: any, i) => (
             <div key={i} style={{ textAlign: 'right' }}>
               {m.roas !== undefined ? <RoasBadge v={m.roas} /> : <span style={{ fontSize: 13, fontWeight: 700, color: m.c || 'var(--text)' }}>{m.v}</span>}

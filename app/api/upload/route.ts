@@ -10,9 +10,12 @@ function initUploadTable(db: any) {
     report_type TEXT NOT NULL DEFAULT 'performance',
     data TEXT NOT NULL,
     filename TEXT,
+    period TEXT,
     uploaded_at TEXT DEFAULT (datetime('now')),
-    UNIQUE(platform, level, report_type)
+    UNIQUE(platform, level, report_type, period)
   )`);
+  // Add period column if upgrading from old schema without it
+  try { db.exec(`ALTER TABLE uploaded_data ADD COLUMN period TEXT`); } catch (_) {}
 }
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -427,19 +430,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Derive a period key from the data's date range (YYYY-MM) or upload date
+  let period = '';
+  if (parsed.dateRange?.start) {
+    period = parsed.dateRange.start.slice(0, 7); // e.g. "2026-03"
+  } else {
+    period = new Date().toISOString().slice(0, 7);
+  }
+
   try {
     const db = getDb();
     initUploadTable(db);
-    db.prepare('INSERT OR REPLACE INTO uploaded_data (platform, level, report_type, data, filename) VALUES (?,?,?,?,?)').run(
-      platform, dataLevel, reportType, JSON.stringify(parsed), file.name
+    // Store with period — each month accumulates as its own row
+    db.prepare('INSERT OR REPLACE INTO uploaded_data (platform, level, report_type, data, filename, period) VALUES (?,?,?,?,?,?)').run(
+      platform, dataLevel, reportType, JSON.stringify(parsed), file.name, period
     );
   } catch (e: any) { console.error('DB save:', e.message); }
 
   const summary = reportType === 'combined_granular'
-    ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, purchases: parsed.conversions, cpa: parsed.cpa, dateRange: parsed.dateRange }
+    ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, purchases: parsed.conversions, cpa: parsed.cpa, dateRange: parsed.dateRange, period }
     : reportType === 'performance'
-      ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, revenue: parsed.revenue, roas: parsed.roas, purchases: parsed.conversions }
-      : { dimensions: parsed.dimensions?.length || 0, breakdownType: reportType };
+      ? { campaigns: parsed.campaigns?.length || 0, spend: parsed.spend, revenue: parsed.revenue, roas: parsed.roas, purchases: parsed.conversions, period }
+      : { dimensions: parsed.dimensions?.length || 0, breakdownType: reportType, period };
 
   return NextResponse.json({ ok: true, platform, level: dataLevel, reportType, ...summary, uploadedAt: parsed.uploadedAt });
 }
@@ -465,7 +477,15 @@ export async function DELETE(req: NextRequest) {
   if (!session || session.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const url = new URL(req.url);
   const platform = url.searchParams.get('platform') || 'facebook';
-  const reportType = url.searchParams.get('report_type') || 'performance';
-  try { const db = getDb(); db.prepare('DELETE FROM uploaded_data WHERE platform = ? AND report_type = ?').run(platform, reportType); } catch {}
+  const period = url.searchParams.get('period') || null; // optional: delete specific month
+  try {
+    const db = getDb();
+    if (period) {
+      db.prepare('DELETE FROM uploaded_data WHERE platform = ? AND period = ?').run(platform, period);
+    } else {
+      // Clear all months for this platform
+      db.prepare('DELETE FROM uploaded_data WHERE platform = ?').run(platform);
+    }
+  } catch {}
   return NextResponse.json({ ok: true });
 }

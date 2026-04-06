@@ -59,18 +59,138 @@ export async function GET() {
     console.error('Facebook API:', err.message);
   }
 
-  // 2. Try uploaded CSV data
+  // 2. Try uploaded CSV data — merge all stored months
   try {
     const { getDb } = require('@/lib/db');
     const db = getDb();
-    const uploaded = db.prepare("SELECT data, filename, uploaded_at FROM uploaded_data WHERE platform = 'facebook' ORDER BY uploaded_at DESC LIMIT 1").get() as any;
-    if (uploaded?.data) {
-      const data = JSON.parse(uploaded.data);
-      // Fill monthly from demo if not in upload
-      if (!data.monthly?.length) data.monthly = FACEBOOK_DEMO.monthly;
-      return NextResponse.json({ data, source: 'upload', filename: uploaded.filename, uploadedAt: uploaded.uploaded_at });
+    const rows = db.prepare("SELECT data, filename, uploaded_at, period FROM uploaded_data WHERE platform = 'facebook' AND report_type IN ('combined_granular','performance') ORDER BY period ASC").all() as any[];
+
+    if (rows?.length > 0) {
+      // Merge all months into one combined view
+      const allCampaigns: Record<string, any> = {};
+      const allDaily: any[] = [];
+      const allAge: Record<string, any> = {};
+      const allGender: Record<string, any> = {};
+      const allAds: Record<string, any> = {};
+      const periods: string[] = [];
+      let totalSpend = 0, totalConversions = 0, totalClicks = 0;
+      let latestFile = '', latestAt = '';
+
+      for (const row of rows) {
+        const d = JSON.parse(row.data);
+        if (row.period) periods.push(row.period);
+        latestFile = row.filename || latestFile;
+        latestAt = row.uploaded_at || latestAt;
+
+        totalSpend += d.spend || 0;
+        totalConversions += d.conversions || 0;
+        totalClicks += d.clicks || 0;
+
+        // Merge daily
+        if (d.daily?.length) allDaily.push(...d.daily);
+
+        // Merge campaigns
+        for (const c of (d.campaigns || [])) {
+          if (!c.name || c.name === '0' || !c.spend) continue;
+          if (!allCampaigns[c.name]) {
+            allCampaigns[c.name] = { ...c, adsets: c.adsets || [] };
+          } else {
+            allCampaigns[c.name].spend += c.spend || 0;
+            allCampaigns[c.name].conversions += c.conversions || 0;
+            allCampaigns[c.name].clicks += c.clicks || 0;
+            allCampaigns[c.name].impressions += (c.impressions || 0);
+            // Merge adsets
+            const existingAdsets: Record<string, any> = {};
+            for (const a of (allCampaigns[c.name].adsets || [])) existingAdsets[a.name] = a;
+            for (const a of (c.adsets || [])) {
+              if (!existingAdsets[a.name]) existingAdsets[a.name] = { ...a };
+              else {
+                existingAdsets[a.name].spend += a.spend || 0;
+                existingAdsets[a.name].conversions += a.conversions || 0;
+                existingAdsets[a.name].clicks += a.clicks || 0;
+              }
+            }
+            allCampaigns[c.name].adsets = Object.values(existingAdsets);
+          }
+        }
+
+        // Merge age breakdown
+        for (const a of (d.ageBreakdown || [])) {
+          if (!allAge[a.age]) allAge[a.age] = { ...a };
+          else { allAge[a.age].spend += a.spend; allAge[a.age].conversions += a.conversions; }
+        }
+
+        // Merge gender breakdown
+        for (const g of (d.genderBreakdown || [])) {
+          if (!allGender[g.gender]) allGender[g.gender] = { ...g };
+          else { allGender[g.gender].spend += g.spend; allGender[g.gender].conversions += g.conversions; }
+        }
+
+        // Merge ad breakdown
+        for (const a of (d.adBreakdown || [])) {
+          const k = `${a.campaign}||${a.name}`;
+          if (!allAds[k]) allAds[k] = { ...a };
+          else { allAds[k].spend += a.spend; allAds[k].conversions += a.conversions; allAds[k].clicks += a.clicks; }
+        }
+      }
+
+      // Recalc derived metrics on merged campaigns
+      const campaignsArr = Object.values(allCampaigns).map((c: any) => {
+        c.cpa = c.conversions > 0 ? parseFloat((c.spend / c.conversions).toFixed(2)) : 0;
+        c.cpc = c.clicks > 0 ? parseFloat((c.spend / c.clicks).toFixed(2)) : 0;
+        c.adsets = (c.adsets || []).map((a: any) => ({
+          ...a,
+          cpa: a.conversions > 0 ? parseFloat((a.spend / a.conversions).toFixed(2)) : 0,
+          cpc: a.clicks > 0 ? parseFloat((a.spend / a.clicks).toFixed(2)) : 0,
+        }));
+        return c;
+      }).sort((a: any, b: any) => b.spend - a.spend);
+
+      // Recalc age pct
+      const totalAgeSpend = Object.values(allAge).reduce((s: number, a: any) => s + a.spend, 0);
+      const ageBreakdown = Object.values(allAge).map((a: any) => ({
+        ...a, cpa: a.conversions > 0 ? parseFloat((a.spend/a.conversions).toFixed(2)) : 0,
+        pct: totalAgeSpend > 0 ? parseFloat(((a.spend/totalAgeSpend)*100).toFixed(1)) : 0,
+      }));
+
+      const totalGenderSpend = Object.values(allGender).reduce((s: number, g: any) => s + g.spend, 0);
+      const genderBreakdown = Object.values(allGender).map((g: any) => ({
+        ...g, pct: totalGenderSpend > 0 ? parseFloat(((g.spend/totalGenderSpend)*100).toFixed(1)) : 0,
+      })).sort((a: any, b: any) => b.spend - a.spend);
+
+      const adBreakdown = Object.values(allAds).map((a: any) => ({
+        ...a, cpa: a.conversions > 0 ? parseFloat((a.spend/a.conversions).toFixed(2)) : 0,
+      })).sort((a: any, b: any) => b.spend - a.spend);
+
+      // Sort daily chronologically
+      allDaily.sort((a: any, b: any) => a.date.localeCompare(b.date));
+
+      const dateRange = periods.length > 0 ? { start: periods[0] + '-01', end: periods[periods.length-1] + '-31' } : undefined;
+
+      const merged = {
+        format: 'combined_granular',
+        spend: parseFloat(totalSpend.toFixed(2)),
+        conversions: totalConversions,
+        clicks: totalClicks,
+        revenue: 0, roas: 0,
+        cpa: totalConversions > 0 ? parseFloat((totalSpend/totalConversions).toFixed(2)) : 0,
+        cpc: totalClicks > 0 ? parseFloat((totalSpend/totalClicks).toFixed(2)) : 0,
+        campaigns: campaignsArr,
+        daily: allDaily,
+        ageBreakdown,
+        genderBreakdown,
+        adBreakdown,
+        monthly: [],
+        dateRange,
+        periods,
+        level: 'ad',
+        reportType: 'combined_granular',
+        uploadedAt: latestAt,
+      };
+
+      return NextResponse.json({ data: merged, source: 'upload', filename: latestFile, uploadedAt: latestAt, periods });
     }
-  } catch {}
+  } catch (e: any) { console.error('FB upload read:', e.message); }
 
   // 3. Demo fallback
   return NextResponse.json({ data: FACEBOOK_DEMO, source: 'demo' });
