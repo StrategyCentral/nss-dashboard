@@ -687,7 +687,7 @@ export default function SeoPage() {
   const [showAddKw, setShowAddKw] = useState(false);
   const [addKwForm, setAddKwForm] = useState({ keyword: '', url: '', category: 'Waxing', volume: '', position: '' });
   const [saving, setSaving] = useState(false);
-  const [source] = useState('demo');
+  const [source, setSource] = useState('demo');
 
   useEffect(() => {
     loadKeywords();
@@ -697,7 +697,12 @@ export default function SeoPage() {
   async function loadKeywords() {
     try {
       const r = await fetch('/api/seo/keywords');
-      if (r.ok) { const d = await r.json(); setKeywords(d.keywords || []); }
+      if (r.ok) {
+        const d = await r.json();
+        const kws = d.keywords || [];
+        setKeywords(kws);
+        if (kws.length > 0) setSource('live');
+      }
     } catch {}
   }
 
@@ -753,7 +758,7 @@ export default function SeoPage() {
           <h1 className="section-title" style={{ fontSize: 26 }}>SEO Rankings</h1>
           <p className="section-sub">Keyword positions, site structure &amp; organic growth</p>
         </div>
-        <span className={`badge ${source === 'demo' ? 'badge-demo' : 'badge-live'}`}>{source === 'demo' ? 'Demo Data' : 'Live'}</span>
+        {source === 'demo' && <span className="badge badge-demo">Demo Data</span>}
       </div>
 
       {/* KPI Cards */}

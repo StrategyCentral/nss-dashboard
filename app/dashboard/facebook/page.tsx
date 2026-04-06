@@ -548,8 +548,9 @@ export default function FacebookPage() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => setShowUpload(!showUpload)} className="btn btn-ghost" style={{ fontSize: 12, color: source === 'upload' ? '#04aae8' : undefined }}>📂 Upload CSV</button>
-          <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: `${badge.color}18`, color: badge.color, border: `1px solid ${badge.color}33` }}>{badge.label}</span>
+          {source !== 'demo' && (
+            <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: `${badge.color}18`, color: badge.color, border: `1px solid ${badge.color}33` }}>{badge.label}</span>
+          )}
         </div>
       </div>
 

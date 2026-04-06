@@ -36,7 +36,7 @@ export default function QuarterlyPage() {
           <h1 className="section-title" style={{ fontSize: 26 }}>Quarterly Revenue</h1>
           <p className="section-sub">Revenue vs ad spend by quarter — Facebook & Google isolated</p>
         </div>
-        <span className={`badge ${source === 'demo' ? 'badge-demo' : 'badge-live'}`}>{source === 'demo' ? 'Demo Data' : 'Live'}</span>
+        {source === 'demo' && <span className="badge badge-demo">Demo Data</span>}
       </div>
 
       <div className="stats-grid" style={{ marginBottom: 24 }}>

@@ -31,7 +31,7 @@ export default function GooglePage() {
           <h1 className="section-title" style={{ fontSize: 26 }}>Google Ads</h1>
           <p className="section-sub">Adwords spend, revenue & ROAS by campaign</p>
         </div>
-        <span className={`badge ${source === 'demo' ? 'badge-demo' : 'badge-live'}`}>{source === 'demo' ? 'Demo Data' : 'Live'}</span>
+        {source === 'demo' && <span className="badge badge-demo">Demo Data</span>}
       </div>
 
       <div className="stats-grid" style={{ marginBottom: 24 }}>
