@@ -14,7 +14,7 @@ const NAV = [
 ];
 const ADMIN = [
   { href: '/admin/connections', icon: '⟳', label: 'Connections' },
-  { href: '/admin/keys', icon: '⚿', label: 'API Keys' },
+
   { href: '/admin/users', icon: '◉', label: 'Users' },
   { href: '/admin/seo-costs', icon: '⊞', label: 'SEO Costs' },
 ];

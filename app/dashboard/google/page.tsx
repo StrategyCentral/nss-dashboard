@@ -18,7 +18,7 @@ function roasColor(r: number) {
 function SetupBanner({ setup }: { setup: { hasToken: boolean; hasCustomerId: boolean; hasDevToken: boolean } }) {
   const steps = [
     { done: setup.hasToken, label: 'Connect Google Account', action: 'Go to Admin → Connections and click Connect Google' },
-    { done: setup.hasCustomerId, label: 'Set Google Ads Customer ID', action: 'Go to Admin → API Keys and add google_ads_customer_id' },
+    { done: setup.hasCustomerId, label: 'Set Google Ads Customer ID', action: 'Go to Admin → Connections and add the Google Ads Customer ID' },
     { done: setup.hasDevToken, label: 'Set Developer Token', action: 'Add GOOGLE_ADS_DEVELOPER_TOKEN env var in Railway' },
   ];
   const allDone = steps.every(s => s.done);
@@ -55,11 +55,11 @@ function SetupBanner({ setup }: { setup: { hasToken: boolean; hasCustomerId: boo
             background: 'rgba(66,133,244,0.15)', color: '#4285f4',
             border: '1px solid rgba(66,133,244,0.3)', textDecoration: 'none',
           }}>Connections →</a>
-          <a href="/admin/keys" style={{
+          <a href="/admin/connections" style={{
             fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 6,
             background: 'rgba(255,255,255,0.05)', color: 'var(--muted)',
             border: '1px solid var(--border)', textDecoration: 'none',
-          }}>API Keys →</a>
+          }}>Connections →</a>
         </div>
       </div>
     </div>
