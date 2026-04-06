@@ -774,7 +774,7 @@ export default function SeoPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div className="section-title" style={{ fontSize: 15 }}>Average Position Over Time</div>
-            <div className="section-sub">Trending down = climbing up Google ↓ is good</div>
+            <div className="section-sub">Lower number = higher on Google. Improving ↑</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 4 }}>
