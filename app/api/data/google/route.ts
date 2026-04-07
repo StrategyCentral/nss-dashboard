@@ -10,19 +10,17 @@ async function getValidGoogleToken(): Promise<string | null> {
   const token = getOAuthToken('google');
   if (!token?.access_token) return null;
 
-  // Check expiry (refresh 5 min early)
   if (token.expires_at) {
     const expiresAt = new Date(token.expires_at).getTime();
     if (Date.now() < expiresAt - 5 * 60 * 1000) return token.access_token;
   }
 
-  if (!token.refresh_token) return token.access_token; // no refresh token, try anyway
+  if (!token.refresh_token) return token.access_token;
 
   try {
     const res = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
-      headers: {
-      'login-customer-id': cid, 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: token.refresh_token,
@@ -46,38 +44,45 @@ async function getValidGoogleToken(): Promise<string | null> {
   }
 }
 
-// ── Google Ads GAQL query helper ───────────────────────────────────────────────
-async function gaqlQuery(accessToken: string, customerId: string, query: string) {
+// ── Google Ads GAQL query ──────────────────────────────────────────────────────
+async function gaqlQuery(accessToken: string, clientCid: string, managerCid: string, query: string) {
   const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '';
-  const url = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${customerId}/googleAds:search`;
+  const url = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${clientCid}/googleAds:search`;
+
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${accessToken}`,
+    'developer-token': devToken,
+    'Content-Type': 'application/json',
+  };
+
+  // login-customer-id is only needed when accessing a client account via a manager account
+  // It should be the MANAGER account ID, not the client account ID
+  if (managerCid && managerCid !== clientCid) {
+    headers['login-customer-id'] = managerCid;
+  }
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'login-customer-id': cid,
-      'Authorization': `Bearer ${accessToken}`,
-      'developer-token': devToken,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ query }),
     signal: AbortSignal.timeout(12000),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    // Surface the full Google error detail for easier debugging
+    const msg = err?.error?.details?.[0]?.errors?.[0]?.message
+      || err?.error?.message
+      || `HTTP ${res.status}`;
+    throw new Error(msg);
   }
   return res.json();
 }
 
-// ── Build dashboard data from Google Ads API ───────────────────────────────────
-async function fetchGoogleAdsData(accessToken: string, customerId: string) {
-  // Strip hyphens from customer ID
-  const cid = customerId.replace(/-/g, '');
-
+// ── Build dashboard data ───────────────────────────────────────────────────────
+async function fetchGoogleAdsData(accessToken: string, clientCid: string, managerCid: string) {
   const [campaignRes, monthlyRes] = await Promise.all([
-    // This-month campaign breakdown
-    gaqlQuery(accessToken, cid, `
+    gaqlQuery(accessToken, clientCid, managerCid, `
       SELECT campaign.name,
              metrics.cost_micros,
              metrics.conversions_value,
@@ -91,8 +96,7 @@ async function fetchGoogleAdsData(accessToken: string, customerId: string) {
       ORDER BY metrics.cost_micros DESC
       LIMIT 20
     `),
-    // Monthly trend last 6 months
-    gaqlQuery(accessToken, cid, `
+    gaqlQuery(accessToken, clientCid, managerCid, `
       SELECT segments.month,
              metrics.cost_micros,
              metrics.conversions_value
@@ -102,7 +106,6 @@ async function fetchGoogleAdsData(accessToken: string, customerId: string) {
     `),
   ]);
 
-  // Aggregate campaign-level totals
   const campaigns = (campaignRes.results || []).map((r: any) => {
     const spend = (r.metrics?.costMicros || 0) / 1_000_000;
     const revenue = r.metrics?.conversionsValue || 0;
@@ -117,7 +120,6 @@ async function fetchGoogleAdsData(accessToken: string, customerId: string) {
     };
   });
 
-  // Overall KPIs
   const totalSpend = campaigns.reduce((s: number, c: any) => s + c.spend, 0);
   const totalRevenue = campaigns.reduce((s: number, c: any) => s + c.revenue, 0);
   const totalConversions = campaigns.reduce((s: number, c: any) => s + c.conversions, 0);
@@ -125,7 +127,6 @@ async function fetchGoogleAdsData(accessToken: string, customerId: string) {
   const roas = totalSpend > 0 ? parseFloat((totalRevenue / totalSpend).toFixed(2)) : 0;
   const avgCpc = totalClicks > 0 ? parseFloat((totalSpend / totalClicks).toFixed(2)) : 0;
 
-  // Monthly rollup — group by month string
   const monthMap: Record<string, { spend: number; revenue: number }> = {};
   for (const r of (monthlyRes.results || [])) {
     const key = r.segments?.month || '';
@@ -146,32 +147,34 @@ async function fetchGoogleAdsData(accessToken: string, customerId: string) {
   return { spend: Math.round(totalSpend), revenue: Math.round(totalRevenue), roas, conversions: totalConversions, cpc: avgCpc, campaigns, monthly };
 }
 
-// ── Route handler ──────────────────────────────────────────────────────────────
+// ── Route ──────────────────────────────────────────────────────────────────────
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Check credentials
   const accessToken = await getValidGoogleToken();
   const db = getDb();
   const getKey = (k: string) => (db.prepare('SELECT key_value FROM api_keys WHERE service = ?').get(k) as any)?.key_value || '';
-  const customerId = getKey('google_ads_customer_id');
-  const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '';
 
-  if (!accessToken || !customerId || !devToken) {
+  // Client account ID (NSS: 329-139-8450)
+  const customerIdRaw = getKey('google_ads_customer_id');
+  // Manager account ID (Bully Marketing Agency: 507-193-1020) — stored separately
+  const managerIdRaw = getKey('google_ads_manager_id') || process.env.GOOGLE_ADS_MANAGER_ID || '';
+
+  const clientCid  = customerIdRaw.replace(/-/g, '');
+  const managerCid = managerIdRaw.replace(/-/g, '');
+  const devToken   = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '';
+
+  if (!accessToken || !clientCid || !devToken) {
     return NextResponse.json({
       data: GOOGLE_DEMO,
       source: 'demo',
-      setup: {
-        hasToken: !!accessToken,
-        hasCustomerId: !!customerId,
-        hasDevToken: !!devToken,
-      },
+      setup: { hasToken: !!accessToken, hasCustomerId: !!clientCid, hasDevToken: !!devToken },
     });
   }
 
   try {
-    const data = await fetchGoogleAdsData(accessToken, customerId);
+    const data = await fetchGoogleAdsData(accessToken, clientCid, managerCid);
     return NextResponse.json({ data, source: 'live' });
   } catch (err: any) {
     console.error('[Google Ads] API error:', err.message);
