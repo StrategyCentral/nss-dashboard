@@ -21,7 +21,8 @@ async function getValidGoogleToken(): Promise<string | null> {
   try {
     const res = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+      'login-customer-id': cid, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: token.refresh_token,
@@ -53,6 +54,7 @@ async function gaqlQuery(accessToken: string, customerId: string, query: string)
   const res = await fetch(url, {
     method: 'POST',
     headers: {
+      'login-customer-id': cid,
       'Authorization': `Bearer ${accessToken}`,
       'developer-token': devToken,
       'Content-Type': 'application/json',
