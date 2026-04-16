@@ -56,6 +56,41 @@ function initSchema(db: any) {
       notes TEXT,
       UNIQUE(year, month)
     );
+    CREATE TABLE IF NOT EXISTS budget_channels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#888888',
+      icon TEXT NOT NULL DEFAULT '●',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS timeline_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_date TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'general',
+      title TEXT NOT NULL,
+      description TEXT,
+      source TEXT DEFAULT 'manual',
+      source_id TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS backlinks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_url TEXT NOT NULL,
+      target_url TEXT NOT NULL,
+      anchor_text TEXT,
+      keyword TEXT,
+      status TEXT DEFAULT 'unchecked',
+      http_status INTEGER,
+      keyword_found INTEGER DEFAULT 0,
+      target_found INTEGER DEFAULT 0,
+      last_checked TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
   try {
     const count = (db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c;
@@ -63,6 +98,20 @@ function initSchema(db: any) {
       const bcrypt = require('bcryptjs');
       const hash = bcrypt.hashSync('nss2024!', 10);
       db.prepare('INSERT INTO users (email, password_hash, role) VALUES (?,?,?)').run('admin@nss.com.au', hash, 'admin');
+    }
+  } catch {}
+  try {
+    const chCount = (db.prepare('SELECT COUNT(*) as c FROM budget_channels').get() as any).c;
+    if (chCount === 0) {
+      const defaults = [
+        { key: 'meta', name: 'Meta Ads', color: '#1877F2', icon: 'f', sort_order: 1 },
+        { key: 'google', name: 'Google Ads', color: '#4285F4', icon: 'G', sort_order: 2 },
+        { key: 'seo', name: 'SEO', color: '#a8cf45', icon: '◎', sort_order: 3 },
+        { key: 'tiktok', name: 'TikTok Ads', color: '#69C9D0', icon: '♪', sort_order: 4 },
+        { key: 'email', name: 'Email', color: '#ffe600', icon: '✉', sort_order: 5 },
+      ];
+      const stmt = db.prepare('INSERT OR IGNORE INTO budget_channels (key, name, color, icon, sort_order) VALUES (?,?,?,?,?)');
+      for (const ch of defaults) stmt.run(ch.key, ch.name, ch.color, ch.icon, ch.sort_order);
     }
   } catch {}
 }

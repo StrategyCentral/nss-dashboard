@@ -5,16 +5,19 @@ import Link from 'next/link';
 
 const NAV = [
   { href: '/dashboard', icon: '◈', label: 'Overview' },
-  { href: '/dashboard/seo', icon: '◎', label: 'SEO Rankings' },
+  { href: '/dashboard/seo', icon: '◎', label: 'SEO' },
   { href: '/dashboard/facebook', icon: 'f', label: 'Facebook Ads' },
   { href: '/dashboard/google', icon: 'G', label: 'Google Ads' },
+  { href: '/dashboard/revenue', icon: '◉', label: 'Revenue Attribution' },
   { href: '/dashboard/quarterly', icon: '◫', label: 'Quarterly Revenue' },
   { href: '/dashboard/seo-roi', icon: '$', label: 'SEO ROI' },
   { href: '/dashboard/overall', icon: '⊕', label: 'Overall ROI' },
+  { href: '/dashboard/timeline', icon: '◷', label: 'Timeline' },
 ];
 const ADMIN = [
   { href: '/admin/connections', icon: '⟳', label: 'Connections' },
-
+  { href: '/admin/attribution', icon: '⊞', label: 'Attribution Backfill' },
+  { href: '/admin/margins', icon: '%', label: 'Product Margins' },
   { href: '/admin/users', icon: '◉', label: 'Users' },
   { href: '/admin/seo-costs', icon: '⊞', label: 'SEO Costs' },
 ];

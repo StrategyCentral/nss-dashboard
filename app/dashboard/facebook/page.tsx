@@ -603,7 +603,7 @@ export default function FacebookPage() {
             ...(isCombined ? [['demographics', '👥 Demographics'], ['ads', '🖼 Ads']] : []),
             ...(lifetimeData ? [['alltime', '📅 All Time']] : []),
           ] as const).map(([tab, label]) => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
+            <button key={tab} onClick={() => setActiveTab(tab as 'overview' | 'demographics' | 'ads' | 'alltime')}
               style={{ padding: '8px 18px', fontSize: 13, fontWeight: activeTab === tab ? 700 : 500, background: 'none', border: 'none', cursor: 'pointer',
                 color: activeTab === tab ? 'var(--text)' : 'var(--muted)',
                 borderBottom: activeTab === tab ? '2px solid #1877F2' : '2px solid transparent', marginBottom: -1 }}>

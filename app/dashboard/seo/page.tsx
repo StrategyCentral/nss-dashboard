@@ -675,6 +675,307 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
 
 // ── Main SEO Page ─────────────────────────────────────────────────────────────
 
+
+// ── Link Monitor Tab ───────────────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, string> = {
+  alive: '#a8cf45', alive_no_target: '#ffe600', dead: '#ff5050',
+  timeout: '#ff8c42', error: '#ff5050', redirect: '#04aae8', unchecked: '#888888',
+};
+const STATUS_LABELS: Record<string, string> = {
+  alive: 'Alive', alive_no_target: 'Live (No Target)', dead: 'Dead',
+  timeout: 'Timeout', error: 'Error', redirect: 'Redirect', unchecked: 'Unchecked',
+};
+
+function parseCsvLinks(raw: string): any[] {
+  const lines = raw.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, '_'));
+  const results: any[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const row: any = {};
+    headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+    if (row.source_url) results.push({ source_url: row.source_url, target_url: row.target_url || '', anchor_text: row.anchor_text || row.anchor || '', keyword: row.keyword || '', notes: row.notes || '' });
+  }
+  return results;
+}
+
+function LinkMonitorTab() {
+  const [links, setLinks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
+  const [checkingId, setCheckingId] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showAdd, setShowAdd] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkCsv, setBulkCsv] = useState('');
+  const [bulkParsed, setBulkParsed] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [checkResults, setCheckResults] = useState<string>('');
+  const [form, setForm] = useState({ source_url: '', target_url: '', anchor_text: '', keyword: '', notes: '' });
+
+  useEffect(() => { loadLinks(); }, [statusFilter]);
+
+  async function loadLinks() {
+    setLoading(true);
+    const q = statusFilter !== 'all' ? `?status=${statusFilter}` : '';
+    const r = await fetch(`/api/seo/links${q}`);
+    if (r.ok) { const d = await r.json(); setLinks(d.links || []); }
+    setLoading(false);
+  }
+
+  async function addLink() {
+    if (!form.source_url || !form.target_url) return;
+    setSaving(true);
+    await fetch('/api/seo/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+    setSaving(false);
+    setForm({ source_url: '', target_url: '', anchor_text: '', keyword: '', notes: '' });
+    setShowAdd(false);
+    loadLinks();
+  }
+
+  async function deleteLink(id: number) {
+    if (!confirm('Remove this backlink?')) return;
+    await fetch('/api/seo/links', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    loadLinks();
+  }
+
+  async function checkLink(id?: number) {
+    if (id) setCheckingId(id); else setChecking(true);
+    setCheckResults('');
+    const body = id ? { ids: [id] } : { force_all: false };
+    const r = await fetch('/api/seo/links/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (id) setCheckingId(null); else setChecking(false);
+    setCheckResults(d.checked ? `Checked ${d.checked} link${d.checked > 1 ? 's' : ''} — ${d.results?.filter((r: any) => r.status === 'alive').length || 0} alive, ${d.results?.filter((r: any) => r.status === 'dead' || r.status === 'error').length || 0} dead` : 'Nothing to check');
+    loadLinks();
+    setTimeout(() => setCheckResults(''), 8000);
+  }
+
+  function handleBulkParse() {
+    setBulkParsed(parseCsvLinks(bulkCsv));
+  }
+
+  async function importBulk() {
+    if (bulkParsed.length === 0) return;
+    setSaving(true);
+    await fetch('/api/seo/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ links: bulkParsed }) });
+    setSaving(false);
+    setShowBulk(false);
+    setBulkCsv('');
+    setBulkParsed([]);
+    loadLinks();
+  }
+
+  const statusCounts: Record<string, number> = {};
+  links.forEach(l => { statusCounts[l.status] = (statusCounts[l.status] || 0) + 1; });
+  const allLinks = links;
+  const alive = links.filter(l => l.status === 'alive').length;
+  const dead = links.filter(l => l.status === 'dead' || l.status === 'error').length;
+  const unchecked = links.filter(l => l.status === 'unchecked').length;
+
+  const inputStyle = { width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' as any };
+
+  return (
+    <div>
+      {/* Stats row */}
+      <div className="stats-grid" style={{ marginBottom: 20 }}>
+        {[
+          { label: 'Total Links', value: String(allLinks.length), color: 'var(--text)' },
+          { label: 'Alive', value: String(alive), color: '#a8cf45' },
+          { label: 'Dead / Error', value: String(dead), color: dead > 0 ? '#ff5050' : 'var(--muted)' },
+          { label: 'Unchecked', value: String(unchecked), color: unchecked > 0 ? '#ffe600' : 'var(--muted)' },
+        ].map(t => (
+          <div key={t.label} className="stat-tile">
+            <span className="label">{t.label}</span>
+            <span className="value" style={{ color: t.color }}>{t.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+          {(['all', 'alive', 'alive_no_target', 'dead', 'unchecked'] as string[]).map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)} style={{
+              padding: '5px 12px', borderRadius: 20, fontSize: 11, cursor: 'pointer', fontWeight: statusFilter === s ? 700 : 400,
+              background: statusFilter === s ? `${STATUS_COLORS[s] || '#888'}22` : 'rgba(255,255,255,0.04)',
+              border: statusFilter === s ? `1px solid ${STATUS_COLORS[s] || '#888'}55` : '1px solid var(--border)',
+              color: statusFilter === s ? (STATUS_COLORS[s] || '#888') : 'var(--muted)',
+            }}>
+              {s === 'all' ? `All (${allLinks.length})` : `${STATUS_LABELS[s]} (${statusCounts[s] || 0})`}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => { setShowBulk(!showBulk); setShowAdd(false); }} style={{ padding: '6px 13px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted)', fontSize: 11 }}>
+            ↑ Bulk Import
+          </button>
+          <button onClick={() => { setShowAdd(!showAdd); setShowBulk(false); }} style={{ padding: '6px 13px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted)', fontSize: 11 }}>
+            + Add Link
+          </button>
+          <button onClick={() => checkLink()} disabled={checking || allLinks.length === 0} style={{ padding: '6px 14px', background: checking ? 'rgba(255,255,255,0.04)' : 'rgba(255,30,142,0.12)', border: '1px solid rgba(255,30,142,0.3)', borderRadius: 6, cursor: 'pointer', color: checking ? 'var(--muted)' : 'var(--pink)', fontWeight: 700, fontSize: 11 }}>
+            {checking ? 'Checking...' : 'Check All Stale'}
+          </button>
+        </div>
+      </div>
+
+      {checkResults && (
+        <div style={{ padding: '8px 14px', background: 'rgba(168,207,69,0.08)', border: '1px solid rgba(168,207,69,0.3)', borderRadius: 6, fontSize: 12, color: '#a8cf45', marginBottom: 12 }}>
+          {checkResults}
+        </div>
+      )}
+
+      {/* Add form */}
+      {showAdd && (
+        <div className="card" style={{ marginBottom: 14, padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Add Backlink</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Source URL (page with the link) *</label>
+              <input value={form.source_url} onChange={e => setForm({ ...form, source_url: e.target.value })} placeholder="https://example.com/page" style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Target URL (NSS page being linked to) *</label>
+              <input value={form.target_url} onChange={e => setForm({ ...form, target_url: e.target.value })} placeholder="https://nationalsalonsupplies.com.au/..." style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Anchor Text</label>
+              <input value={form.anchor_text} onChange={e => setForm({ ...form, anchor_text: e.target.value })} placeholder="e.g. wax strips wholesale" style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Keyword to find on page</label>
+              <input value={form.keyword} onChange={e => setForm({ ...form, keyword: e.target.value })} placeholder="e.g. salon supplies" style={inputStyle} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Notes</label>
+            <input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes" style={inputStyle} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button onClick={() => setShowAdd(false)} style={{ padding: '6px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>Cancel</button>
+            <button onClick={addLink} disabled={saving || !form.source_url || !form.target_url} style={{ padding: '6px 16px', background: 'var(--pink)', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+              {saving ? 'Saving...' : 'Add Link'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk import */}
+      {showBulk && (
+        <div className="card" style={{ marginBottom: 14, padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Bulk Import via CSV</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
+            Paste CSV with columns: <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3 }}>source_url,target_url,anchor_text,keyword,notes</code> (header row required)
+          </div>
+          <textarea value={bulkCsv} onChange={e => { setBulkCsv(e.target.value); setBulkParsed([]); }} rows={6}
+            placeholder={"source_url,target_url,anchor_text,keyword\nhttps://example.com/page,https://nationalsalonsupplies.com.au/wax,buy wax strips,wax strips"}
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.5, marginBottom: 10 }} />
+          {bulkParsed.length > 0 && (
+            <div style={{ fontSize: 12, color: '#a8cf45', marginBottom: 10 }}>
+              Parsed {bulkParsed.length} link{bulkParsed.length !== 1 ? 's' : ''} — ready to import
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button onClick={() => { setShowBulk(false); setBulkCsv(''); setBulkParsed([]); }} style={{ padding: '6px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted)', fontSize: 12 }}>Cancel</button>
+            <button onClick={handleBulkParse} disabled={!bulkCsv.trim()} style={{ padding: '6px 14px', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--text)', fontSize: 12 }}>Parse</button>
+            {bulkParsed.length > 0 && (
+              <button onClick={importBulk} disabled={saving} style={{ padding: '6px 16px', background: 'var(--pink)', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+                {saving ? 'Importing...' : `Import ${bulkParsed.length} Links`}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Links table */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>Loading...</div>
+      ) : links.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔗</div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{statusFilter !== 'all' ? 'No links with this status' : 'No backlinks tracked yet'}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>Add backlinks to monitor their health. Lost links are automatically recorded in the Timeline.</div>
+          <button onClick={() => setShowAdd(true)} style={{ padding: '8px 18px', background: 'var(--pink)', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#fff', fontWeight: 700, fontSize: 12 }}>+ Add First Link</button>
+        </div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Source</th>
+                <th>Target Page</th>
+                <th>Anchor</th>
+                <th>Keyword</th>
+                <th>Kw Found</th>
+                <th>Last Checked</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {links.map(lnk => {
+                const color = STATUS_COLORS[lnk.status] || '#888';
+                const label = STATUS_LABELS[lnk.status] || lnk.status;
+                const lastChecked = lnk.last_checked ? new Date(lnk.last_checked).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
+                let sourceHost = ''; try { sourceHost = new URL(lnk.source_url).hostname.replace('www.',''); } catch {}
+                let targetPath = ''; try { const u = new URL(lnk.target_url); targetPath = u.pathname; } catch { targetPath = lnk.target_url; }
+                return (
+                  <tr key={lnk.id}>
+                    <td>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: `${color}18`, color, border: `1px solid ${color}33` }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                        {label}
+                      </span>
+                    </td>
+                    <td style={{ maxWidth: 200 }}>
+                      <a href={lnk.source_url} target="_blank" rel="noopener" title={lnk.source_url} style={{ color: 'var(--blue)', fontSize: 11, textDecoration: 'none', fontFamily: 'monospace' }}>{sourceHost}</a>
+                      {lnk.http_status && <span style={{ marginLeft: 6, fontSize: 10, color: lnk.http_status >= 400 ? '#ff5050' : 'var(--muted)' }}>{lnk.http_status}</span>}
+                    </td>
+                    <td style={{ maxWidth: 180 }}>
+                      <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'monospace' }} title={lnk.target_url}>{targetPath.length > 30 ? targetPath.slice(0, 30) + '...' : targetPath}</span>
+                      {lnk.target_found === 0 && lnk.status !== 'unchecked' && <span style={{ marginLeft: 4, fontSize: 9, color: '#ff5050' }}>not found</span>}
+                    </td>
+                    <td style={{ fontSize: 11, color: 'var(--muted)' }}>{lnk.anchor_text || <span style={{ opacity: 0.3 }}>—</span>}</td>
+                    <td style={{ fontSize: 11, color: 'var(--muted)' }}>{lnk.keyword || <span style={{ opacity: 0.3 }}>—</span>}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {lnk.keyword ? (
+                        lnk.status === 'unchecked' ? <span style={{ fontSize: 11, color: 'var(--muted)' }}>—</span>
+                        : lnk.keyword_found ? <span style={{ color: '#a8cf45', fontSize: 13 }}>✓</span>
+                        : <span style={{ color: '#ff5050', fontSize: 13 }}>✗</span>
+                      ) : <span style={{ opacity: 0.3, fontSize: 11 }}>—</span>}
+                    </td>
+                    <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                      {lastChecked || <span style={{ opacity: 0.3 }}>Never</span>}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => checkLink(lnk.id)} disabled={checkingId === lnk.id} title="Check now"
+                          style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', color: 'var(--muted)' }}>
+                          {checkingId === lnk.id ? '...' : '↻'}
+                        </button>
+                        <button onClick={() => deleteLink(lnk.id)} title="Remove"
+                          style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 4, cursor: 'pointer', color: '#ff5050' }}>
+                          ×
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10 }}>
+        "Check All Stale" checks links not checked in the last 24h. Lost links auto-create Timeline events.
+        Bulk import format: source_url, target_url, anchor_text, keyword columns.
+      </div>
+    </div>
+  );
+}
+
 export default function SeoPage() {
   const [keywords, setKeywords] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
@@ -688,6 +989,7 @@ export default function SeoPage() {
   const [addKwForm, setAddKwForm] = useState({ keyword: '', url: '', category: 'Waxing', volume: '', position: '' });
   const [saving, setSaving] = useState(false);
   const [source, setSource] = useState('demo');
+  const [mainTab, setMainTab] = useState<'rankings'|'structure'|'links'>('rankings');
 
   useEffect(() => {
     loadKeywords();
@@ -750,16 +1052,34 @@ export default function SeoPage() {
     );
   };
 
+  const TAB_STYLE = (active: boolean, color: string = '#ff1e8e') => ({
+    padding: '7px 18px', borderRadius: 6, fontSize: 12, fontWeight: active ? 700 : 400, cursor: 'pointer',
+    background: active ? `${color}18` : 'rgba(255,255,255,0.04)',
+    border: active ? `1px solid ${color}44` : '1px solid var(--border)',
+    color: active ? color : 'var(--muted)', transition: 'all 0.15s',
+  });
+
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
-          <h1 className="section-title" style={{ fontSize: 26 }}>SEO Rankings</h1>
-          <p className="section-sub">Keyword positions, site structure &amp; organic growth</p>
+          <h1 className="section-title" style={{ fontSize: 26 }}>SEO</h1>
+          <p className="section-sub">Rankings, site structure, backlink monitoring</p>
         </div>
         {source === 'demo' && <span className="badge badge-demo">Demo Data</span>}
       </div>
+
+      {/* Top-level tab nav */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button style={TAB_STYLE(mainTab === 'rankings', '#a8cf45')} onClick={() => setMainTab('rankings')}>◎ Rankings</button>
+        <button style={TAB_STYLE(mainTab === 'structure', '#04aae8')} onClick={() => setMainTab('structure')}>⊞ Site Structure</button>
+        <button style={TAB_STYLE(mainTab === 'links', '#ff1e8e')} onClick={() => setMainTab('links')}>🔗 Link Monitor</button>
+      </div>
+
+      {/* Rankings Tab */}
+      {mainTab === 'rankings' && (
+      <div>
 
       {/* KPI Cards */}
       <div className="stats-grid" style={{ marginBottom: 24 }}>
@@ -935,10 +1255,18 @@ export default function SeoPage() {
         )}
       </div>
 
-      {/* Site Structure */}
-      <div className="card">
-        <SiteStructureVisualiser nodes={nodes} links={links} keywords={keywords} onRefresh={loadStructure} />
-      </div>
+      </div>)} {/* end rankings tab */}
+
+      {/* Structure Tab */}
+      {mainTab === 'structure' && (
+        <div className="card">
+          <SiteStructureVisualiser nodes={nodes} links={links} keywords={keywords} onRefresh={loadStructure} />
+        </div>
+      )}
+
+      {/* Link Monitor Tab */}
+      {mainTab === 'links' && <LinkMonitorTab />}
+
     </div>
   );
 }
