@@ -69,6 +69,7 @@ const GOOGLE_SECTION = {
   ],
   properties: [
     { key: 'google_ads_customer_id', label: 'Google Ads Customer ID', hint: '123-456-7890', note: 'Found in Google Ads → top-right account selector' },
+    { key: 'google_ads_manager_id', label: 'Manager (MCC) Account ID', hint: '507-193-1020', note: 'Your agency MCC account ID — leave blank if no manager account' },
     { key: 'ga4_property_id', label: 'GA4 Property ID', hint: '123456789', note: 'GA4 → Admin → Property Settings' },
     { key: 'gsc_site_main', label: 'Search Console — Main Site', hint: 'https://nationalsalonsupplies.com.au/', note: 'Must match exactly as shown in GSC', prefill: 'https://nationalsalonsupplies.com.au/' },
     { key: 'gsc_site_blog', label: 'Search Console — Blog', hint: 'https://nationalsalonsupplies.com.au/beauty/', note: 'Subfolder property in GSC', prefill: 'https://nationalsalonsupplies.com.au/beauty/' },
