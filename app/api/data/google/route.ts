@@ -69,7 +69,9 @@ async function gaqlQuery(accessToken: string, clientCid: string, managerCid: str
   });
 
   if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
+    const rawText = await res.text().catch(() => '');
+    console.error('[Google Ads DEBUG] Full error body:', rawText.substring(0, 500));
+    const errBody = rawText ? JSON.parse(rawText).catch?.(() => {}) || (() => { try { return JSON.parse(rawText); } catch { return {}; } })() : {};
     // Surface the full Google error detail for easier debugging
     const detail = errBody?.error?.details?.[0]?.errors?.[0]?.message
       || errBody?.error?.details?.[0]?.reason
@@ -84,6 +86,10 @@ async function gaqlQuery(accessToken: string, clientCid: string, managerCid: str
 
 // ── Build dashboard data ───────────────────────────────────────────────────────
 async function fetchGoogleAdsData(accessToken: string, clientCid: string, managerCid: string) {
+  console.error('[Google Ads DEBUG] clientCid:', clientCid, 'managerCid:', managerCid, 'devToken present:', !!devToken, 'token prefix:', accessToken.substring(0,10));
+  const url_check = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${clientCid}/googleAds:search`;
+  console.error('[Google Ads DEBUG] URL:', url_check);
+
   const [campaignRes, monthlyRes] = await Promise.all([
     gaqlQuery(accessToken, clientCid, managerCid, `
       SELECT campaign.name,
