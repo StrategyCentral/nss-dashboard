@@ -104,7 +104,7 @@ async function fetchGoogleAdsData(accessToken: string, clientCid: string, manage
              metrics.cost_micros,
              metrics.conversions_value
       FROM campaign
-      WHERE segments.date DURING LAST_6_MONTHS
+      WHERE segments.date DURING LAST_180_DAYS
       ORDER BY segments.month ASC
     `),
   ]);
