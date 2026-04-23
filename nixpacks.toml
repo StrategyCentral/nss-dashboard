@@ -5,7 +5,7 @@ nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
 cmds = ["npm install --legacy-peer-deps"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["rm -rf .next/cache", "npm run build"]
 
 [start]
 cmd = "npx next start -p ${PORT:-8080}"
