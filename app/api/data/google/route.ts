@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { GOOGLE_DEMO } from '@/lib/demo-data';
 import { getOAuthToken, saveOAuthToken, getDb } from '@/lib/db';
 
-const GOOGLE_ADS_API_VERSION = 'v18';
+const GOOGLE_ADS_API_VERSION = 'v20';
 
 // ── Token refresh ──────────────────────────────────────────────────────────────
 async function getValidGoogleToken(): Promise<string | null> {
