@@ -84,6 +84,9 @@ async function gaqlQuery(accessToken: string, clientCid: string, managerCid: str
 
 // ── Build dashboard data ───────────────────────────────────────────────────────
 async function fetchGoogleAdsData(accessToken: string, clientCid: string, managerCid: string, devToken: string) {
+  const today = new Date().toISOString().split('T')[0];
+  const sixMonthsAgo = new Date(Date.now() - 183 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
   const [campaignRes, monthlyRes] = await Promise.all([
     gaqlQuery(accessToken, clientCid, managerCid, devToken, `
       SELECT campaign.name,
@@ -104,7 +107,7 @@ async function fetchGoogleAdsData(accessToken: string, clientCid: string, manage
              metrics.cost_micros,
              metrics.conversions_value
       FROM campaign
-      WHERE segments.date DURING LAST_180_DAYS
+      WHERE segments.date BETWEEN '${sixMonthsAgo}' AND '${today}'
       ORDER BY segments.month ASC
     `),
   ]);
