@@ -29,7 +29,10 @@ async function getValidGoogleToken(): Promise<string | null> {
       }),
     });
     const data = await res.json();
-    if (!data.access_token) return token.access_token;
+    if (!data.access_token) {
+      console.error('[Google OAuth] Refresh failed:', JSON.stringify(data));
+      return null; // Force re-auth rather than using expired token
+    }
 
     saveOAuthToken('google', {
       access_token: data.access_token,
@@ -39,8 +42,9 @@ async function getValidGoogleToken(): Promise<string | null> {
       extra_data: token.extra_data,
     });
     return data.access_token;
-  } catch {
-    return token.access_token;
+  } catch (e: any) {
+    console.error('[Google OAuth] Refresh exception:', e.message);
+    return null; // Force re-auth
   }
 }
 
