@@ -45,8 +45,7 @@ async function getValidGoogleToken(): Promise<string | null> {
 }
 
 // ── Google Ads GAQL query ──────────────────────────────────────────────────────
-async function gaqlQuery(accessToken: string, clientCid: string, managerCid: string, query: string) {
-  const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '';
+async function gaqlQuery(accessToken: string, clientCid: string, managerCid: string, devToken: string, query: string) {
   const url = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${clientCid}/googleAds:search`;
 
   const headers: Record<string, string> = {
@@ -55,11 +54,11 @@ async function gaqlQuery(accessToken: string, clientCid: string, managerCid: str
     'Content-Type': 'application/json',
   };
 
-  // login-customer-id is only needed when accessing a client account via a manager account
-  // It should be the MANAGER account ID, not the client account ID
   if (managerCid && managerCid !== clientCid) {
     headers['login-customer-id'] = managerCid;
   }
+
+  console.log('[Google Ads] Calling:', url, '| manager:', managerCid || 'none');
 
   const res = await fetch(url, {
     method: 'POST',
@@ -70,28 +69,23 @@ async function gaqlQuery(accessToken: string, clientCid: string, managerCid: str
 
   if (!res.ok) {
     const rawText = await res.text().catch(() => '');
-    console.error('[Google Ads DEBUG] Full error body:', rawText.substring(0, 500));
-    const errBody = rawText ? JSON.parse(rawText).catch?.(() => {}) || (() => { try { return JSON.parse(rawText); } catch { return {}; } })() : {};
-    // Surface the full Google error detail for easier debugging
-    const detail = errBody?.error?.details?.[0]?.errors?.[0]?.message
-      || errBody?.error?.details?.[0]?.reason
-      || errBody?.error?.message
-      || `HTTP ${res.status}`;
-    const fullMsg = `${detail} [status=${res.status}] [raw=${JSON.stringify(errBody?.error?.details?.[0] ?? errBody?.error ?? {})}]`;
-    console.error('[Google Ads raw error]', fullMsg);
-    throw new Error(fullMsg);
+    console.error('[Google Ads] Error status:', res.status, '| body:', rawText.substring(0, 500));
+    let errBody: any = {};
+    try { errBody = JSON.parse(rawText); } catch { /* non-JSON */ }
+    const detail =
+      errBody?.error?.details?.[0]?.errors?.[0]?.message ||
+      errBody?.error?.message ||
+      rawText.substring(0, 200) ||
+      `HTTP ${res.status}`;
+    throw new Error(`[${res.status}] ${detail}`);
   }
   return res.json();
 }
 
 // ── Build dashboard data ───────────────────────────────────────────────────────
-async function fetchGoogleAdsData(accessToken: string, clientCid: string, managerCid: string) {
-  console.error('[Google Ads DEBUG] clientCid:', clientCid, 'managerCid:', managerCid, 'devToken present:', !!devToken, 'token prefix:', accessToken.substring(0,10));
-  const url_check = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${clientCid}/googleAds:search`;
-  console.error('[Google Ads DEBUG] URL:', url_check);
-
+async function fetchGoogleAdsData(accessToken: string, clientCid: string, managerCid: string, devToken: string) {
   const [campaignRes, monthlyRes] = await Promise.all([
-    gaqlQuery(accessToken, clientCid, managerCid, `
+    gaqlQuery(accessToken, clientCid, managerCid, devToken, `
       SELECT campaign.name,
              metrics.cost_micros,
              metrics.conversions_value,
@@ -105,7 +99,7 @@ async function fetchGoogleAdsData(accessToken: string, clientCid: string, manage
       ORDER BY metrics.cost_micros DESC
       LIMIT 20
     `),
-    gaqlQuery(accessToken, clientCid, managerCid, `
+    gaqlQuery(accessToken, clientCid, managerCid, devToken, `
       SELECT segments.month,
              metrics.cost_micros,
              metrics.conversions_value
@@ -165,14 +159,14 @@ export async function GET() {
   const db = getDb();
   const getKey = (k: string) => (db.prepare('SELECT key_value FROM api_keys WHERE service = ?').get(k) as any)?.key_value || '';
 
-  // Client account ID (NSS: 329-139-8450)
   const customerIdRaw = getKey('google_ads_customer_id');
-  // Manager account ID (Bully Marketing Agency: 507-193-1020) — stored separately
-  const managerIdRaw = getKey('google_ads_manager_id') || process.env.GOOGLE_ADS_MANAGER_ID || '';
+  const managerIdRaw  = getKey('google_ads_manager_id') || process.env.GOOGLE_ADS_MANAGER_ID || '';
+  const devToken      = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '';
 
   const clientCid  = customerIdRaw.replace(/-/g, '');
   const managerCid = managerIdRaw.replace(/-/g, '');
-  const devToken   = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '';
+
+  console.log('[Google Ads] Setup check — token:', !!accessToken, '| clientCid:', clientCid, '| managerCid:', managerCid, '| devToken:', !!devToken);
 
   if (!accessToken || !clientCid || !devToken) {
     return NextResponse.json({
@@ -183,7 +177,7 @@ export async function GET() {
   }
 
   try {
-    const data = await fetchGoogleAdsData(accessToken, clientCid, managerCid);
+    const data = await fetchGoogleAdsData(accessToken, clientCid, managerCid, devToken);
     return NextResponse.json({ data, source: 'live' });
   } catch (err: any) {
     console.error('[Google Ads] API error:', err.message);
