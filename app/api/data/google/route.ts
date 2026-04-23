@@ -69,12 +69,15 @@ async function gaqlQuery(accessToken: string, clientCid: string, managerCid: str
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const errBody = await res.json().catch(() => ({}));
     // Surface the full Google error detail for easier debugging
-    const msg = err?.error?.details?.[0]?.errors?.[0]?.message
-      || err?.error?.message
+    const detail = errBody?.error?.details?.[0]?.errors?.[0]?.message
+      || errBody?.error?.details?.[0]?.reason
+      || errBody?.error?.message
       || `HTTP ${res.status}`;
-    throw new Error(msg);
+    const fullMsg = `${detail} [status=${res.status}] [raw=${JSON.stringify(errBody?.error?.details?.[0] ?? errBody?.error ?? {})}]`;
+    console.error('[Google Ads raw error]', fullMsg);
+    throw new Error(fullMsg);
   }
   return res.json();
 }
