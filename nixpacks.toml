@@ -2,7 +2,7 @@
 NEXT_TELEMETRY_DISABLED = "1"
 
 [phases.setup]
-nixPkgs = ["python3"]
+nixPkgs = ["nodejs_20", "python3"]
 
 [phases.install]
 cmds = ["npm install"]
