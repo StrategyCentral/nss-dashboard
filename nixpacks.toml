@@ -1,3 +1,6 @@
+[variables]
+NEXT_TELEMETRY_DISABLED = "1"
+
 [phases.install]
 cmds = ["npm install"]
 
