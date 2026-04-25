@@ -8,6 +8,7 @@ const NAV = [
   { href: '/dashboard/seo', icon: '◎', label: 'SEO' },
   { href: '/dashboard/facebook', icon: 'f', label: 'Facebook Ads' },
   { href: '/dashboard/google', icon: 'G', label: 'Google Ads' },
+  { href: '/dashboard/youtube-ads', icon: '▶', label: 'YouTube Ads' },
   { href: '/dashboard/revenue', icon: '◉', label: 'Revenue Attribution' },
   { href: '/dashboard/quarterly', icon: '◫', label: 'Quarterly Revenue' },
   { href: '/dashboard/seo-roi', icon: '$', label: 'SEO ROI' },
