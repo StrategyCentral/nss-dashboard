@@ -46,3 +46,46 @@ export async function GET() {
     refresh_result: refreshResult,
   });
 }
+
+export async function POST() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Get a fresh token
+  const token = getOAuthToken('google');
+  if (!token?.access_token) return NextResponse.json({ error: 'No token' });
+
+  const devToken = (process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '').trim();
+  const clientCid = '3291398450';
+  const managerCid = '5071931020';
+
+  // Test 1: with MCC header
+  const res1 = await fetch(`https://googleads.googleapis.com/v20/customers/${clientCid}/googleAds:search`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token.access_token}`,
+      'developer-token': devToken,
+      'login-customer-id': managerCid,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query: 'SELECT customer.id FROM customer LIMIT 1' }),
+  });
+  const body1 = await res1.text();
+
+  // Test 2: without MCC header
+  const res2 = await fetch(`https://googleads.googleapis.com/v20/customers/${clientCid}/googleAds:search`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token.access_token}`,
+      'developer-token': devToken,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query: 'SELECT customer.id FROM customer LIMIT 1' }),
+  });
+  const body2 = await res2.text();
+
+  return NextResponse.json({
+    with_mcc: { status: res1.status, body: body1.substring(0, 300) },
+    without_mcc: { status: res2.status, body: body2.substring(0, 300) },
+  });
+}
