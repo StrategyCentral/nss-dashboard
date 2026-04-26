@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveOAuthToken, getDb } from '@/lib/db';
+import { saveOAuthToken, getOAuthToken, getDb } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -40,9 +40,14 @@ export async function GET(req: NextRequest) {
       ].filter(Boolean),
     };
 
+    // Preserve existing refresh_token if Google doesn't return a new one
+    // (Google only returns refresh_token on first consent, not re-consent)
+    const existingToken = getOAuthToken('google');
+    const refreshToken = tokenData.refresh_token || existingToken?.refresh_token;
+
     saveOAuthToken('google', {
       access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      refresh_token: refreshToken,
       expires_at: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : undefined,
       scope: tokenData.scope,
       extra_data: JSON.stringify(extra),

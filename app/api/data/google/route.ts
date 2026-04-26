@@ -15,7 +15,10 @@ async function getValidGoogleToken(): Promise<string | null> {
     if (Date.now() < expiresAt - 5 * 60 * 1000) return token.access_token;
   }
 
-  if (!token.refresh_token) return token.access_token;
+  if (!token.refresh_token) {
+    console.error('[Google OAuth] Token expired and no refresh_token stored — reconnect required');
+    return null;
+  }
 
   try {
     console.log('[Google OAuth] Attempting refresh, expires_at:', token.expires_at, '| has_refresh:', !!token.refresh_token, '| client_id prefix:', (process.env.GOOGLE_CLIENT_ID || '').substring(0, 15));
