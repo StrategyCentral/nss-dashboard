@@ -168,12 +168,12 @@ export async function GET() {
 
   const customerIdRaw = getKey('google_ads_customer_id');
   const managerIdRaw  = getKey('google_ads_manager_id') || process.env.GOOGLE_ADS_MANAGER_ID || '';
-  const devToken      = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '';
+  const devToken      = (process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '').trim();
 
   const clientCid  = customerIdRaw.replace(/-/g, '');
   const managerCid = managerIdRaw.replace(/-/g, '');
 
-  console.log('[Google Ads] Setup check — token:', !!accessToken, '| clientCid:', clientCid, '| managerCid:', managerCid, '| devToken:', !!devToken);
+  console.log('[Google Ads] Setup check — token:', !!accessToken, '| clientCid:', clientCid, '| managerCid:', managerCid, '| devToken len:', devToken.length, '| devToken:', devToken);
 
   if (!accessToken || !clientCid || !devToken) {
     return NextResponse.json({
