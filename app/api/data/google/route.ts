@@ -18,6 +18,7 @@ async function getValidGoogleToken(): Promise<string | null> {
   if (!token.refresh_token) return token.access_token;
 
   try {
+    console.log('[Google OAuth] Attempting refresh, expires_at:', token.expires_at, '| has_refresh:', !!token.refresh_token, '| client_id prefix:', (process.env.GOOGLE_CLIENT_ID || '').substring(0, 15));
     const res = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -29,6 +30,7 @@ async function getValidGoogleToken(): Promise<string | null> {
       }),
     });
     const data = await res.json();
+    console.log('[Google OAuth] Refresh response — has_token:', !!data.access_token, '| error:', data.error || 'none', '| expires_in:', data.expires_in);
     if (!data.access_token) {
       console.error('[Google OAuth] Refresh failed:', JSON.stringify(data));
       return null; // Force re-auth rather than using expired token
@@ -62,7 +64,7 @@ async function gaqlQuery(accessToken: string, clientCid: string, managerCid: str
     headers['login-customer-id'] = managerCid;
   }
 
-  console.log('[Google Ads] Calling:', url, '| manager:', managerCid || 'none');
+  console.log('[Google Ads] Calling:', url, '| manager:', managerCid || 'none', '| token prefix:', accessToken.substring(0, 20));
 
   const res = await fetch(url, {
     method: 'POST',
