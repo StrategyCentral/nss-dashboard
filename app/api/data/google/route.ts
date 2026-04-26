@@ -21,7 +21,6 @@ async function getValidGoogleToken(): Promise<string | null> {
   }
 
   try {
-    console.log('[Google OAuth] Attempting refresh, expires_at:', token.expires_at, '| has_refresh:', !!token.refresh_token, '| client_id prefix:', (process.env.GOOGLE_CLIENT_ID || '').substring(0, 15));
     const res = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -33,7 +32,6 @@ async function getValidGoogleToken(): Promise<string | null> {
       }),
     });
     const data = await res.json();
-    console.log('[Google OAuth] Refresh response — has_token:', !!data.access_token, '| error:', data.error || 'none', '| expires_in:', data.expires_in);
     if (!data.access_token) {
       console.error('[Google OAuth] Refresh failed:', JSON.stringify(data));
       return null; // Force re-auth rather than using expired token
@@ -67,7 +65,7 @@ async function gaqlQuery(accessToken: string, clientCid: string, managerCid: str
     headers['login-customer-id'] = managerCid;
   }
 
-  console.log('[Google Ads] Calling:', url, '| manager:', managerCid || 'none', '| token prefix:', accessToken.substring(0, 20));
+  console.log('[Google Ads] Calling:', url, '| manager:', managerCid || 'none');
 
   const res = await fetch(url, {
     method: 'POST',
@@ -178,7 +176,7 @@ export async function GET() {
   const clientCid  = customerIdRaw.replace(/-/g, '');
   const managerCid = managerIdRaw.replace(/-/g, '');
 
-  console.log('[Google Ads] Setup check — token:', !!accessToken, '| clientCid:', clientCid, '| managerCid:', managerCid, '| devToken len:', devToken.length, '| devToken:', devToken);
+  console.log('[Google Ads] Setup check — token:', !!accessToken, '| clientCid:', clientCid, '| managerCid:', managerCid);
 
   if (!accessToken || !clientCid || !devToken) {
     return NextResponse.json({
