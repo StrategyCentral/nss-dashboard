@@ -76,6 +76,18 @@ export async function POST() {
   const clientCid = '3291398450';
   const managerCid = '5071931020';
 
+  // Test 0: validate token against Google userinfo
+  const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
+    headers: { 'Authorization': `Bearer ${freshToken}` },
+  });
+  const userInfo = await userInfoRes.json() as Record<string, unknown>;
+
+  // Test 0b: Search Console (should work if token is valid)
+  const gscRes = await fetch('https://www.googleapis.com/webmasters/v3/sites', {
+    headers: { 'Authorization': `Bearer ${freshToken}` },
+  });
+  const gscBody = await gscRes.text();
+
   // Test 1: with MCC header
   const res1 = await fetch(`https://googleads.googleapis.com/v20/customers/${clientCid}/googleAds:search`, {
     method: 'POST',
@@ -102,6 +114,10 @@ export async function POST() {
   const body2 = await res2.text();
 
   return NextResponse.json({
+    userinfo_status: userInfoRes.status,
+    userinfo_email: (userInfo.email as string) || (userInfo.error as string) || 'none',
+    gsc_status: gscRes.status,
+    gsc_body_start: gscBody.substring(0, 100),
     with_mcc: { status: res1.status, body: body1.substring(0, 300) },
     without_mcc: { status: res2.status, body: body2.substring(0, 300) },
   });
