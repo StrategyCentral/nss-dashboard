@@ -1,0 +1,48 @@
+import { NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth';
+import { getOAuthToken } from '@/lib/db';
+
+export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const token = getOAuthToken('google');
+  if (!token) return NextResponse.json({ error: 'No token stored' });
+
+  const now = Date.now();
+  const expiresAt = token.expires_at ? new Date(token.expires_at as string).getTime() : null;
+  const isExpired = expiresAt ? now > expiresAt : null;
+
+  let refreshResult: Record<string, unknown> = {};
+  if (token.refresh_token) {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: token.refresh_token as string,
+        client_id: process.env.GOOGLE_CLIENT_ID || '',
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      }),
+    });
+    const data = await res.json() as Record<string, unknown>;
+    refreshResult = {
+      status: res.status,
+      has_new_token: !!(data.access_token),
+      error: data.error || null,
+      error_description: data.error_description || null,
+      new_token_prefix: data.access_token ? (data.access_token as string).substring(0, 20) : null,
+    };
+  }
+
+  return NextResponse.json({
+    has_access_token: !!token.access_token,
+    has_refresh_token: !!token.refresh_token,
+    old_token_prefix: token.access_token ? (token.access_token as string).substring(0, 20) : null,
+    expires_at: token.expires_at,
+    is_expired: isExpired,
+    scope: token.scope,
+    client_id_prefix: (process.env.GOOGLE_CLIENT_ID || '').substring(0, 25),
+    refresh_result: refreshResult,
+  });
+}
