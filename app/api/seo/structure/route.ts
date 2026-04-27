@@ -93,6 +93,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    if (action === 'bulk_import') {
+      const { nodes: importNodes, clearExisting } = body;
+      if (!Array.isArray(importNodes) || importNodes.length === 0) {
+        return NextResponse.json({ error: 'No nodes provided' }, { status: 400 });
+      }
+
+      if (clearExisting) {
+        db.prepare('DELETE FROM seo_nodes').run();
+        db.prepare('DELETE FROM seo_links').run();
+      }
+
+      const insertNode = db.prepare('INSERT OR REPLACE INTO seo_nodes (id,label,url,type,status,position,traffic,clicks,silo,parent,working_on) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+      const insertLink = db.prepare('INSERT INTO seo_links (from_node,to_node,type) VALUES (?,?,?)');
+      let imported = 0;
+
+      const insertMany = db.transaction(() => {
+        for (const n of importNodes) {
+          const nodeId = n.id || `node-${Date.now()}-${imported}`;
+          insertNode.run(
+            nodeId,
+            n.label || 'Untitled',
+            n.url || '',
+            n.type || 'page',
+            n.status || 'planned',
+            n.position ? parseInt(n.position) : null,
+            n.traffic ? parseInt(n.traffic) : 0,
+            n.clicks ? parseInt(n.clicks) : 0,
+            n.silo || null,
+            n.parent || null,
+            n.working_on ? 1 : 0
+          );
+          if (n.parent) {
+            insertLink.run(n.parent, nodeId, 'internal');
+          }
+          imported++;
+        }
+      });
+      insertMany();
+
+      return NextResponse.json({ ok: true, imported });
+    }
+
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

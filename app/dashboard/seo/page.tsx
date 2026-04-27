@@ -519,6 +519,86 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
   const [showAddNode, setShowAddNode] = useState(false);
   const [addForm, setAddForm] = useState({ label: '', url: '', type: 'category', silo: '', parent: '' });
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['home', 'silo-waxing', 'silo-nails', 'silo-tanning']));
+  const [showImport, setShowImport] = useState(false);
+  const [csvText, setCsvText] = useState('');
+  const [parsedNodes, setParsedNodes] = useState<any[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const [clearExisting, setClearExisting] = useState(false);
+
+  function parseStructureCsv(raw: string) {
+    const lines = raw.trim().split(/\r?\n/);
+    if (lines.length < 2) { setParsedNodes([]); return; }
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''));
+    const results: any[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      // Handle quoted CSV fields
+      const vals: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (const ch of lines[i]) {
+        if (ch === '"') { inQuotes = !inQuotes; }
+        else if (ch === ',' && !inQuotes) { vals.push(current.trim()); current = ''; }
+        else { current += ch; }
+      }
+      vals.push(current.trim());
+      const row: any = {};
+      headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+      // Map common aliases
+      const label = row.label || row.name || row.page_name || row.title || '';
+      if (!label) continue;
+      const nodeId = row.id || row.node_id || label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      results.push({
+        id: nodeId,
+        label,
+        url: row.url || row.path || '',
+        type: row.type || row.node_type || row.page_type || 'page',
+        status: row.status || 'planned',
+        silo: row.silo || row.silo_name || '',
+        parent: row.parent || row.parent_id || '',
+        position: row.position || row.pos || '',
+        traffic: row.traffic || row.visits || '0',
+        clicks: row.clicks || '0',
+        working_on: (row.working_on === '1' || row.working_on === 'true') ? 1 : 0,
+      });
+    }
+    setParsedNodes(results);
+  }
+
+  function handleCsvFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      setCsvText(text);
+      parseStructureCsv(text);
+    };
+    reader.readAsText(file);
+  }
+
+  async function runImport() {
+    if (parsedNodes.length === 0) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const r = await fetch('/api/seo/structure', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bulk_import', nodes: parsedNodes, clearExisting }),
+      });
+      const data = await r.json();
+      if (data.ok) {
+        setImportResult(`✓ Imported ${data.imported} pages`);
+        onRefresh();
+        setTimeout(() => { setShowImport(false); setCsvText(''); setParsedNodes([]); setImportResult(null); }, 1500);
+      } else {
+        setImportResult(`✗ Error: ${data.error}`);
+      }
+    } catch (err: any) {
+      setImportResult(`✗ Error: ${err.message}`);
+    }
+    setImporting(false);
+  }
 
   async function toggleWorking(id: string, e: React.MouseEvent) {
     e.stopPropagation();
@@ -627,6 +707,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
             </div>
           ))}
           <button onClick={() => setShowAddNode(!showAddNode)} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}>+ Add Page</button>
+          <button onClick={() => { setShowImport(!showImport); setShowAddNode(false); }} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', borderColor: showImport ? '#04aae8' : undefined, color: showImport ? '#04aae8' : undefined }}>📄 Import CSV</button>
         </div>
       </div>
 
@@ -652,6 +733,103 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={addNode} className="btn btn-pink" style={{ fontSize: 12 }}>Add Page</button>
             <button onClick={() => setShowAddNode(false)} className="btn btn-ghost" style={{ fontSize: 12 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {showImport && (
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#04aae8' }}>Import Site Structure from CSV</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Upload a .csv file or paste CSV data below</div>
+            </div>
+            <button onClick={() => { setShowImport(false); setCsvText(''); setParsedNodes([]); setImportResult(null); }} className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }}>✕</button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: 'rgba(4,170,232,0.1)', border: '1px solid rgba(4,170,232,0.3)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#04aae8' }}>
+              📂 Choose File
+              <input type="file" accept=".csv,.txt" onChange={handleCsvFileUpload} style={{ display: 'none' }} />
+            </label>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>or paste CSV below</span>
+          </div>
+
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+              Required column: <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3 }}>label</code> &nbsp;
+              Optional: <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3 }}>url, type, status, silo, parent, position, traffic, clicks, id</code>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+              Valid types: {ALL_TYPES.map(t => <code key={t} style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 3, marginRight: 4 }}>{t}</code>)}
+            </div>
+            <textarea
+              className="form-input"
+              rows={6}
+              placeholder={`label,url,type,status,silo,parent\nWax Strips,/waxing/wax-strips/,category,live,Waxing,silo-waxing\nHard Wax Beads,/waxing/hard-wax/,category,planned,Waxing,silo-waxing`}
+              value={csvText}
+              onChange={e => { setCsvText(e.target.value); parseStructureCsv(e.target.value); }}
+              style={{ fontFamily: 'monospace', fontSize: 11, width: '100%' }}
+            />
+          </div>
+
+          {parsedNodes.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--green)' }}>
+                ✓ Parsed {parsedNodes.length} page{parsedNodes.length !== 1 ? 's' : ''} — preview:
+              </div>
+              <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.04)', position: 'sticky', top: 0 }}>
+                      {['ID', 'Label', 'URL', 'Type', 'Status', 'Silo', 'Parent'].map(h => (
+                        <th key={h} style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid var(--border)', color: 'var(--muted)', fontWeight: 600 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedNodes.slice(0, 50).map((n, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '4px 8px', color: 'var(--muted)', fontFamily: 'monospace' }}>{n.id}</td>
+                        <td style={{ padding: '4px 8px', fontWeight: 600 }}>{n.label}</td>
+                        <td style={{ padding: '4px 8px', color: 'var(--muted)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.url}</td>
+                        <td style={{ padding: '4px 8px' }}>
+                          <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${NODE_COLORS[n.type] || '#888'}15`, color: NODE_COLORS[n.type] || '#888' }}>
+                            {NODE_TYPE_LABELS[n.type] || n.type}
+                          </span>
+                        </td>
+                        <td style={{ padding: '4px 8px', color: n.status === 'live' ? 'var(--green)' : 'var(--muted)' }}>{n.status}</td>
+                        <td style={{ padding: '4px 8px' }}>{n.silo}</td>
+                        <td style={{ padding: '4px 8px', color: 'var(--muted)', fontFamily: 'monospace' }}>{n.parent || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {parsedNodes.length > 50 && <div style={{ padding: 8, textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>...and {parsedNodes.length - 50} more</div>}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={clearExisting} onChange={e => setClearExisting(e.target.checked)} style={{ accentColor: '#ff5050' }} />
+              <span style={{ color: clearExisting ? '#ff5050' : 'var(--muted)' }}>Clear existing structure first</span>
+            </label>
+            <button
+              onClick={runImport}
+              disabled={importing || parsedNodes.length === 0}
+              className="btn btn-pink"
+              style={{ fontSize: 12, opacity: parsedNodes.length === 0 ? 0.4 : 1 }}
+            >
+              {importing ? 'Importing...' : `Import ${parsedNodes.length} Page${parsedNodes.length !== 1 ? 's' : ''}`}
+            </button>
+            {importResult && (
+              <span style={{ fontSize: 12, fontWeight: 600, color: importResult.startsWith('✓') ? 'var(--green)' : '#ff5050' }}>{importResult}</span>
+            )}
+          </div>
+
+          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
+            💡 <strong>Tip:</strong> Set <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 3 }}>parent</code> to an existing node ID (e.g. <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 3 }}>silo-waxing</code>) to nest pages under a parent. Import creates links automatically.
           </div>
         </div>
       )}
