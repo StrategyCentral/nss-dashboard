@@ -104,17 +104,43 @@ export async function POST(req: NextRequest) {
         db.prepare('DELETE FROM seo_links').run();
       }
 
-      const insertNode = db.prepare('INSERT OR REPLACE INTO seo_nodes (id,label,url,type,status,position,traffic,clicks,silo,parent,working_on) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+      // Build lookup sets of existing IDs and URLs to avoid overwrites
+      const existingIds = new Set(
+        (db.prepare('SELECT id FROM seo_nodes').all() as any[]).map(r => r.id)
+      );
+      const existingUrls = new Set(
+        (db.prepare("SELECT url FROM seo_nodes WHERE url != '' AND url IS NOT NULL").all() as any[]).map(r => r.url)
+      );
+
+      const insertNode = db.prepare('INSERT INTO seo_nodes (id,label,url,type,status,position,traffic,clicks,silo,parent,working_on) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
       const insertLink = db.prepare('INSERT INTO seo_links (from_node,to_node,type) VALUES (?,?,?)');
       let imported = 0;
+      let skipped = 0;
+      const skippedItems: string[] = [];
 
       const insertMany = db.transaction(() => {
         for (const n of importNodes) {
-          const nodeId = n.id || `node-${Date.now()}-${imported}`;
+          let nodeId = n.id || `node-${Date.now()}-${imported}-${skipped}`;
+          const url = n.url || '';
+
+          // Skip if ID already exists
+          if (existingIds.has(nodeId)) {
+            skipped++;
+            skippedItems.push(`${n.label} (id: ${nodeId})`);
+            continue;
+          }
+
+          // Skip if URL already exists (non-empty URLs only)
+          if (url && existingUrls.has(url)) {
+            skipped++;
+            skippedItems.push(`${n.label} (url: ${url})`);
+            continue;
+          }
+
           insertNode.run(
             nodeId,
             n.label || 'Untitled',
-            n.url || '',
+            url,
             n.type || 'page',
             n.status || 'planned',
             n.position ? parseInt(n.position) : null,
@@ -127,12 +153,14 @@ export async function POST(req: NextRequest) {
           if (n.parent) {
             insertLink.run(n.parent, nodeId, 'internal');
           }
+          existingIds.add(nodeId);
+          if (url) existingUrls.add(url);
           imported++;
         }
       });
       insertMany();
 
-      return NextResponse.json({ ok: true, imported });
+      return NextResponse.json({ ok: true, imported, skipped, skippedItems: skippedItems.slice(0, 20) });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

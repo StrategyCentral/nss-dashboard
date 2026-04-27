@@ -588,9 +588,12 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
       });
       const data = await r.json();
       if (data.ok) {
-        setImportResult(`✓ Imported ${data.imported} pages`);
+        const msg = data.skipped > 0
+          ? `✓ Imported ${data.imported} pages (${data.skipped} skipped — already exist)`
+          : `✓ Imported ${data.imported} pages`;
+        setImportResult(msg);
         onRefresh();
-        setTimeout(() => { setShowImport(false); setCsvText(''); setParsedNodes([]); setImportResult(null); }, 1500);
+        setTimeout(() => { setShowImport(false); setCsvText(''); setParsedNodes([]); setImportResult(null); }, 2500);
       } else {
         setImportResult(`✗ Error: ${data.error}`);
       }
