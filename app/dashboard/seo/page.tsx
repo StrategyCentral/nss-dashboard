@@ -755,6 +755,24 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
               📂 Choose File
               <input type="file" accept=".csv,.txt" onChange={handleCsvFileUpload} style={{ display: 'none' }} />
             </label>
+            <button
+              onClick={() => {
+                const template = [
+                  'label,url,type,status,silo,parent,position,traffic,clicks',
+                  'Wax Strips,/waxing/wax-strips/,category,live,Waxing,silo-waxing,3,340,28',
+                  'Hard Wax Beads,/waxing/hard-wax/,category,planned,Waxing,silo-waxing,,0,0',
+                  'How To Brazilian Wax,/blog/how-to-brazilian-wax/,post,live,Waxing,cat-wax-strips,6,520,41',
+                  'Gel Polish,/nails/gel-polish/,category,live,Nails,silo-nails,5,380,29',
+                ].join('\n');
+                const blob = new Blob([template], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'site-structure-template.csv'; a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="btn btn-ghost"
+              style={{ fontSize: 12, padding: '7px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >⬇ Download Template</button>
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>or paste CSV below</span>
           </div>
 
