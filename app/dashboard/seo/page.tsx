@@ -13,17 +13,17 @@ const PERIODS = [
 
 const NODE_COLORS: Record<string, string> = {
   home: '#ff1e8e', silo: '#a8cf45', category: '#04aae8',
-  post: '#ffe600', 'sa-post': '#f97316', page: '#a78bfa',
+  post: '#ffe600', 'sa-post': '#f97316', 'sa-cluster': '#e879f9', page: '#a78bfa',
   'location-page': '#22d3ee', product: '#ff8c42', 'product-cat': '#c084fc',
 };
 
 const NODE_TYPE_LABELS: Record<string, string> = {
   home: 'Home', silo: 'Silo', category: 'Category',
-  post: 'Blog Post', 'sa-post': 'SA Post', page: 'Page',
+  post: 'Blog Post', 'sa-post': 'SA Post', 'sa-cluster': 'SA Cluster', page: 'Page',
   'location-page': 'Location Page', product: 'Product', 'product-cat': 'Product Category',
 };
 
-const ALL_TYPES = ['silo', 'category', 'post', 'sa-post', 'page', 'location-page', 'product-cat', 'product'];
+const ALL_TYPES = ['silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
 
 const TREND_DATA: Record<string, any[]> = {
   '7d': [
@@ -548,10 +548,13 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
       const label = row.label || row.name || row.page_name || row.title || '';
       if (!label) continue;
       const nodeId = row.id || row.node_id || label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      // Auto-strip domain from full URLs, keeping only the path
+      let rawUrl = row.url || row.path || '';
+      try { if (rawUrl.startsWith('http')) { rawUrl = new URL(rawUrl).pathname; } } catch {}
       results.push({
         id: nodeId,
         label,
-        url: row.url || row.path || '',
+        url: rawUrl,
         type: row.type || row.node_type || row.page_type || 'page',
         status: row.status || 'planned',
         silo: row.silo || row.silo_name || '',
