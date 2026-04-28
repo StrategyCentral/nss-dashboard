@@ -23,7 +23,7 @@ const NODE_TYPE_LABELS: Record<string, string> = {
   'location-page': 'Location Page', product: 'Product', 'product-cat': 'Product Category',
 };
 
-const ALL_TYPES = ['silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
+const ALL_TYPES = ['home', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
 
 const TREND_DATA: Record<string, any[]> = {
   '7d': [
@@ -754,7 +754,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
               <select className="form-input" value={addForm.type} onChange={e => setAddForm(f => ({ ...f, type: e.target.value }))}>
                 {ALL_TYPES.map(t => <option key={t} value={t}>{NODE_TYPE_LABELS[t] || t}</option>)}
               </select></div>
-            <div><label className="form-label">Silo</label>
+            <div><label className="form-label">Silo Term</label>
               <input className="form-input" placeholder="e.g. Waxing" value={addForm.silo} onChange={e => setAddForm(f => ({ ...f, silo: e.target.value }))} /></div>
             <div><label className="form-label">Parent Page</label>
               <select className="form-input" value={addForm.parent} onChange={e => setAddForm(f => ({ ...f, parent: e.target.value }))}>
