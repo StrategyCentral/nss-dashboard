@@ -93,6 +93,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    if (action === 'rename_node') {
+      const { oldId, newId } = body;
+      if (!oldId || !newId) return NextResponse.json({ error: 'oldId and newId required' }, { status: 400 });
+      db.prepare('UPDATE seo_nodes SET id = ? WHERE id = ?').run(newId, oldId);
+      db.prepare('UPDATE seo_nodes SET parent = ? WHERE parent = ?').run(newId, oldId);
+      db.prepare('UPDATE seo_links SET from_node = ? WHERE from_node = ?').run(newId, oldId);
+      db.prepare('UPDATE seo_links SET to_node = ? WHERE to_node = ?').run(newId, oldId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === 'reparent_bulk') {
+      const { oldParent, newParent } = body;
+      if (!oldParent || !newParent) return NextResponse.json({ error: 'oldParent and newParent required' }, { status: 400 });
+      const result = db.prepare('UPDATE seo_nodes SET parent = ? WHERE parent = ?').run(newParent, oldParent);
+      return NextResponse.json({ ok: true, updated: result.changes });
+    }
+
     if (action === 'bulk_import') {
       const { nodes: importNodes, clearExisting } = body;
       if (!Array.isArray(importNodes) || importNodes.length === 0) {
