@@ -600,21 +600,37 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
     setImporting(true);
     setImportResult(null);
     try {
-      const r = await fetch('/api/seo/structure', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'bulk_import', nodes: parsedNodes, clearExisting }),
-      });
-      const data = await r.json();
-      if (data.ok) {
-        const msg = data.skipped > 0
-          ? `✓ Imported ${data.imported} pages (${data.skipped} skipped — already exist)`
-          : `✓ Imported ${data.imported} pages`;
-        setImportResult(msg);
-        onRefresh();
-        setTimeout(() => { setShowImport(false); setCsvText(''); setParsedNodes([]); setImportResult(null); }, 2500);
-      } else {
-        setImportResult(`✗ Error: ${data.error}`);
+      const CHUNK_SIZE = 500;
+      let totalImported = 0;
+      let totalSkipped = 0;
+      const chunks = [];
+      for (let i = 0; i < parsedNodes.length; i += CHUNK_SIZE) {
+        chunks.push(parsedNodes.slice(i, i + CHUNK_SIZE));
       }
+      for (let i = 0; i < chunks.length; i++) {
+        if (chunks.length > 1) {
+          setImportResult(`Importing batch ${i + 1}/${chunks.length}...`);
+        }
+        const r = await fetch('/api/seo/structure', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'bulk_import', nodes: chunks[i], clearExisting: i === 0 && clearExisting }),
+        });
+        const data = await r.json();
+        if (data.ok) {
+          totalImported += data.imported;
+          totalSkipped += data.skipped;
+        } else {
+          setImportResult(`✗ Error on batch ${i + 1}: ${data.error}`);
+          setImporting(false);
+          return;
+        }
+      }
+      const msg = totalSkipped > 0
+        ? `✓ Imported ${totalImported} pages (${totalSkipped} skipped — already exist)`
+        : `✓ Imported ${totalImported} pages`;
+      setImportResult(msg);
+      onRefresh();
+      setTimeout(() => { setShowImport(false); setCsvText(''); setParsedNodes([]); setImportResult(null); }, 3000);
     } catch (err: any) {
       setImportResult(`✗ Error: ${err.message}`);
     }
@@ -826,7 +842,19 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
           {parsedNodes.length > 0 && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--green)' }}>
-                ✓ Parsed {parsedNodes.length} page{parsedNodes.length !== 1 ? 's' : ''} — preview:
+                ✓ Parsed {parsedNodes.length} page{parsedNodes.length !== 1 ? 's' : ''}
+              </div>
+              {/* Type summary */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                {Object.entries(parsedNodes.reduce((acc: Record<string, number>, n) => { acc[n.type] = (acc[n.type] || 0) + 1; return acc; }, {} as Record<string, number>))
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([t, c]) => (
+                    <span key={t} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                      background: `${NODE_COLORS[t] || '#888'}20`, color: NODE_COLORS[t] || '#888',
+                      border: `1px solid ${NODE_COLORS[t] || '#888'}30` }}>
+                      {NODE_TYPE_LABELS[t] || t}: {c}
+                    </span>
+                  ))}
               </div>
               <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
