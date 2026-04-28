@@ -62,16 +62,29 @@ export async function GET() {
         GROUP BY url
       `).all() as any[];
       
+      // Build lookup maps: exact URL, and by slug (last path segment)
       const urlMap = new Map(kwByUrl.map((r: any) => [r.url, r]));
+      const slugMap = new Map<string, any>();
+      for (const r of kwByUrl) {
+        const slug = r.url.replace(/\/+$/, '').split('/').pop() || '';
+        if (slug && !slugMap.has(slug)) slugMap.set(slug, r);
+      }
       
       for (const node of nodes) {
-        if (node.url) {
-          const match = urlMap.get(node.url);
-          if (match) {
-            // Only override if node doesn't already have real data
-            if (!node.position || node.position === 0) node.position = match.best_position;
-            if (!node.traffic || node.traffic === 0) node.traffic = match.total_volume;
-          }
+        if (!node.url) continue;
+        // Try exact match first
+        let match = urlMap.get(node.url);
+        // Try without trailing slash variations
+        if (!match) match = urlMap.get(node.url.replace(/\/+$/, '') + '/');
+        if (!match) match = urlMap.get(node.url.replace(/\/+$/, ''));
+        // Try slug match (e.g. node /beauty/waxing/ matches keyword /waxing/)
+        if (!match) {
+          const nodeSlug = node.url.replace(/\/+$/, '').split('/').pop() || '';
+          if (nodeSlug) match = slugMap.get(nodeSlug);
+        }
+        if (match) {
+          if (!node.position || node.position === 0) node.position = match.best_position;
+          if (!node.traffic || node.traffic === 0) node.traffic = match.total_volume;
         }
       }
     } catch { /* keywords table might not exist yet */ }
