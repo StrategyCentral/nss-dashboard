@@ -100,7 +100,7 @@ function PosBadge({ pos }: { pos: number | null }) {
 
 function NodeDetailPanel({ node, keywords, nodes, onClose, onRefresh }: any) {
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState<any>({ label: '', url: '', type: 'page', status: 'planned' });
+  const [editForm, setEditForm] = useState<any>({ label: '', url: '', type: 'page', status: 'planned', parent: '', silo: '' });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reassignParent, setReassignParent] = useState('');
   const [revenueData, setRevenueData] = useState<any>(null);
@@ -191,7 +191,7 @@ function NodeDetailPanel({ node, keywords, nodes, onClose, onRefresh }: any) {
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
-            onClick={() => { if (!editing) setEditForm({ label: node.label, url: node.url || '', type: node.type, status: node.status }); setEditing(!editing); setShowDeleteConfirm(false); }}
+            onClick={() => { if (!editing) setEditForm({ label: node.label, url: node.url || '', type: node.type, status: node.status, parent: node.parent || '', silo: node.silo || '' }); setEditing(!editing); setShowDeleteConfirm(false); }}
             style={{ background: editing ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.06)',
               border: `1px solid ${editing ? '#a78bfa44' : 'var(--border)'}`,
               color: editing ? '#a78bfa' : 'var(--muted)', padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12 }}>
@@ -236,6 +236,15 @@ function NodeDetailPanel({ node, keywords, nodes, onClose, onRefresh }: any) {
                   {['live', 'planned', 'broken'].map(s => <option key={s} value={s}>{s}</option>)}
                 </select></div>
             </div>
+            <div><label className="form-label">Parent Page</label>
+              <select className="form-input" value={editForm.parent} onChange={e => setEditForm((f: any) => ({ ...f, parent: e.target.value }))}>
+                <option value="">— None (root) —</option>
+                {(nodes || []).filter((n: any) => (n.id || n.nodeId) !== (node.id || node.nodeId)).map((n: any) => (
+                  <option key={n.id || n.nodeId} value={n.id || n.nodeId}>{n.label}</option>
+                ))}
+              </select></div>
+            <div><label className="form-label">Silo Term</label>
+              <input className="form-input" placeholder="e.g. Waxing" value={editForm.silo} onChange={e => setEditForm((f: any) => ({ ...f, silo: e.target.value }))} /></div>
           </div>
           <button onClick={saveEdit} className="btn btn-pink" style={{ fontSize: 12, marginTop: 12, width: '100%' }}>Save Changes</button>
         </div>
@@ -724,7 +733,12 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
     );
   }
 
-  const rootNodes = nodes.filter((n: any) => !n.parent || n.type === 'home');
+  const rootNodes = nodes.filter((n: any) => !n.parent || n.type === 'home')
+    .sort((a: any, b: any) => {
+      if (a.type === 'home') return -1;
+      if (b.type === 'home') return 1;
+      return typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type);
+    });
 
   return (
     <div>
