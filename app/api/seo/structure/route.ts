@@ -51,7 +51,17 @@ export async function GET() {
     const links = db.prepare('SELECT * FROM seo_links').all();
 
     // Merge keyword ranking data into nodes by URL match
+    let kwMerged = 0;
     try {
+      // Ensure keywords table exists
+      db.exec(`CREATE TABLE IF NOT EXISTS seo_keywords (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        keyword TEXT NOT NULL, position INTEGER, prev_position INTEGER,
+        volume INTEGER DEFAULT 0, url TEXT DEFAULT '',
+        category TEXT DEFAULT 'Uncategorized', trend TEXT DEFAULT 'flat',
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
+
       const kwByUrl = db.prepare(`
         SELECT url, 
                MIN(position) as best_position, 
@@ -85,11 +95,12 @@ export async function GET() {
         if (match) {
           if (!node.position || node.position === 0) node.position = match.best_position;
           if (!node.traffic || node.traffic === 0) node.traffic = match.total_volume;
+          kwMerged++;
         }
       }
-    } catch { /* keywords table might not exist yet */ }
+    } catch (e: any) { console.error('Keyword merge error:', e.message); }
 
-    return NextResponse.json({ nodes, links });
+    return NextResponse.json({ nodes, links, kwMerged });
   } catch {
     return NextResponse.json({ nodes: SITE_STRUCTURE_NODES, links: SITE_LINKS });
   }
