@@ -14,16 +14,16 @@ const PERIODS = [
 const NODE_COLORS: Record<string, string> = {
   home: '#ff1e8e', silo: '#a8cf45', category: '#04aae8',
   post: '#ffe600', 'sa-post': '#f97316', 'sa-cluster': '#e879f9', page: '#a78bfa',
-  'location-page': '#22d3ee', product: '#ff8c42', 'product-cat': '#c084fc',
+  'location-page': '#22d3ee', product: '#ff8c42', 'product-cat': '#c084fc', shop: '#fbbf24',
 };
 
 const NODE_TYPE_LABELS: Record<string, string> = {
   home: 'Home', silo: 'Silo', category: 'Category',
   post: 'Blog Post', 'sa-post': 'SA Post', 'sa-cluster': 'SA Cluster', page: 'Page',
-  'location-page': 'Location Page', product: 'Product', 'product-cat': 'Product Category',
+  'location-page': 'Location Page', product: 'Product', 'product-cat': 'Product Category', shop: 'Shop',
 };
 
-const ALL_TYPES = ['home', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
+const ALL_TYPES = ['home', 'shop', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
 
 const TREND_DATA: Record<string, any[]> = {
   '7d': [
@@ -666,7 +666,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
     onRefresh();
   }
 
-  const typeOrder = ['home', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
+  const typeOrder = ['home', 'shop', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
 
   function getChildren(parentId: string) {
     return nodes.filter((n: any) => n.parent === parentId);
@@ -680,6 +680,8 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
     const children = getChildren(node.id || node.nodeId);
     const isExpanded = expanded.has(node.id || node.nodeId);
 
+    const isShop = node.type === 'shop';
+
     return (
       <div key={node.id || node.nodeId} style={{ marginLeft: depth * 20, position: 'relative' }}>
         {depth > 0 && (
@@ -689,9 +691,9 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
           <div
             onClick={() => setSelectedNode(node)}
             style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 8, cursor: 'pointer',
-              border: `1.5px solid ${isLive ? color + '55' : isBroken ? '#ff505055' : '#ffffff15'}`,
-              background: isLive ? `${color}08` : 'rgba(255,255,255,0.02)',
-              boxShadow: isLive ? `0 0 10px ${color}30` : isBroken ? '0 0 10px rgba(255,80,80,0.3)' : 'none',
+              border: `1.5px solid ${isShop ? 'rgba(251,191,36,0.6)' : isLive ? color + '55' : isBroken ? '#ff505055' : '#ffffff15'}`,
+              background: isShop && isLive ? 'linear-gradient(135deg, rgba(251,191,36,0.12) 0%, rgba(245,158,11,0.06) 50%, rgba(251,191,36,0.12) 100%)' : isLive ? `${color}08` : 'rgba(255,255,255,0.02)',
+              boxShadow: isShop && isLive ? '0 0 15px rgba(251,191,36,0.25), inset 0 0 20px rgba(251,191,36,0.05)' : isLive ? `0 0 10px ${color}30` : isBroken ? '0 0 10px rgba(255,80,80,0.3)' : 'none',
               opacity: node.status === 'planned' ? 0.5 : 1, transition: 'all 0.15s' }}>
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0,
               boxShadow: isLive ? `0 0 5px ${color}` : 'none' }} />

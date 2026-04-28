@@ -47,8 +47,35 @@ export async function GET() {
   try {
     const db = getDb();
     initStructureTable(db);
-    const nodes = db.prepare('SELECT * FROM seo_nodes').all();
+    const nodes = db.prepare('SELECT * FROM seo_nodes').all() as any[];
     const links = db.prepare('SELECT * FROM seo_links').all();
+
+    // Merge keyword ranking data into nodes by URL match
+    try {
+      const kwByUrl = db.prepare(`
+        SELECT url, 
+               MIN(position) as best_position, 
+               SUM(volume) as total_volume,
+               COUNT(*) as keyword_count
+        FROM seo_keywords 
+        WHERE url IS NOT NULL AND url != '' AND position IS NOT NULL
+        GROUP BY url
+      `).all() as any[];
+      
+      const urlMap = new Map(kwByUrl.map((r: any) => [r.url, r]));
+      
+      for (const node of nodes) {
+        if (node.url) {
+          const match = urlMap.get(node.url);
+          if (match) {
+            // Only override if node doesn't already have real data
+            if (!node.position || node.position === 0) node.position = match.best_position;
+            if (!node.traffic || node.traffic === 0) node.traffic = match.total_volume;
+          }
+        }
+      }
+    } catch { /* keywords table might not exist yet */ }
+
     return NextResponse.json({ nodes, links });
   } catch {
     return NextResponse.json({ nodes: SITE_STRUCTURE_NODES, links: SITE_LINKS });
