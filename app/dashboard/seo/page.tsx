@@ -526,6 +526,21 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
   const [importResult, setImportResult] = useState<string | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
 
+  // Normalize type values from CSV — handles 'SA Cluster', 'sa_cluster', 'SA Post', 'Blog Post', 'Location Page', etc.
+  function normalizeType(raw: string): string {
+    const v = raw.trim().toLowerCase().replace(/[\s_]+/g, '-');
+    // Map common label variations to internal type keys
+    const aliases: Record<string, string> = {
+      'blog-post': 'post', 'blog': 'post',
+      'sa-cluster': 'sa-cluster', 'sacluster': 'sa-cluster',
+      'sa-post': 'sa-post', 'sapost': 'sa-post',
+      'location-page': 'location-page', 'locationpage': 'location-page', 'location': 'location-page',
+      'product-cat': 'product-cat', 'product-category': 'product-cat', 'productcat': 'product-cat', 'productcategory': 'product-cat',
+      'silo': 'silo', 'category': 'category', 'page': 'page', 'product': 'product', 'home': 'home',
+    };
+    return aliases[v] || (ALL_TYPES.includes(v) ? v : 'page');
+  }
+
   function parseStructureCsv(raw: string) {
     const lines = raw.trim().split(/\r?\n/);
     if (lines.length < 2) { setParsedNodes([]); return; }
@@ -555,7 +570,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
         id: nodeId,
         label,
         url: rawUrl,
-        type: row.type || row.node_type || row.page_type || 'page',
+        type: normalizeType(row.type || row.node_type || row.page_type || 'page'),
         status: row.status || 'planned',
         silo: row.silo || row.silo_name || '',
         parent: row.parent || row.parent_id || '',
@@ -626,7 +641,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
     onRefresh();
   }
 
-  const typeOrder = ['home', 'silo', 'category', 'post', 'sa-post', 'page', 'location-page', 'product-cat', 'product'];
+  const typeOrder = ['home', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
 
   function getChildren(parentId: string) {
     return nodes.filter((n: any) => n.parent === parentId);
@@ -818,7 +833,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
                         <td style={{ padding: '4px 8px', fontWeight: 600 }}>{n.label}</td>
                         <td style={{ padding: '4px 8px', color: 'var(--muted)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.url}</td>
                         <td style={{ padding: '4px 8px' }}>
-                          <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${NODE_COLORS[n.type] || '#888'}15`, color: NODE_COLORS[n.type] || '#888' }}>
+                          <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${NODE_COLORS[n.type] || '#888'}20`, color: NODE_COLORS[n.type] || '#888', border: `1px solid ${NODE_COLORS[n.type] || '#888'}30` }}>
                             {NODE_TYPE_LABELS[n.type] || n.type}
                           </span>
                         </td>
