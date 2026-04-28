@@ -727,6 +727,17 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
               {l.label}
             </div>
           ))}
+          <button onClick={() => {
+            const parentIds = new Set(nodes.map((n: any) => n.parent).filter(Boolean));
+            const nodesWithChildren = nodes.filter((n: any) => parentIds.has(n.id || n.nodeId)).map((n: any) => n.id || n.nodeId);
+            if (expanded.size >= nodesWithChildren.length) {
+              setExpanded(new Set());
+            } else {
+              setExpanded(new Set(nodesWithChildren));
+            }
+          }} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}>
+            {expanded.size > 3 ? '▾ Collapse All' : '▸ Expand All'}
+          </button>
           <button onClick={() => setShowAddNode(!showAddNode)} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}>+ Add Page</button>
           <button onClick={() => { setShowImport(!showImport); setShowAddNode(false); }} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', borderColor: showImport ? '#04aae8' : undefined, color: showImport ? '#04aae8' : undefined }}>📄 Import CSV</button>
         </div>
