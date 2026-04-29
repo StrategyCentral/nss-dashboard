@@ -66,6 +66,7 @@ function EventCard({ ev, isAdmin, onEdit, onDelete }: any) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 4, background: `${color}22`, color }}>{ev.platform}</span>
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{TYPE_LABELS[ev.type] || ev.type}</span>
+              {ev.hours > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: 'rgba(168,207,69,0.15)', color: '#a8cf45', border: '1px solid rgba(168,207,69,0.3)' }}>🕐 {ev.hours}h</span>}
               {ev.source === 'link_monitor' && <span style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(167,139,250,0.12)', padding: '1px 6px', borderRadius: 3 }}>auto</span>}
             </div>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: ev.description ? 4 : 0 }}>{ev.title}</div>
@@ -90,10 +91,11 @@ function EventForm({ initial, onSave, onCancel }: { initial?: any; onSave: (data
   const [type, setType] = useState(initial?.type || 'general');
   const [title, setTitle] = useState(initial?.title || '');
   const [description, setDescription] = useState(initial?.description || '');
+  const [hours, setHours] = useState(initial?.hours || '');
 
   function submit() {
     if (!title.trim()) return;
-    onSave({ event_date, platform, type, title, description });
+    onSave({ event_date, platform, type, title, description, hours: hours ? parseFloat(hours) : null });
   }
 
   const fieldStyle = { width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' as any };
@@ -102,7 +104,7 @@ function EventForm({ initial, onSave, onCancel }: { initial?: any; onSave: (data
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 18, marginBottom: 20 }}>
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>{initial ? 'Edit Event' : 'Add Timeline Event'}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 10, marginBottom: 10 }}>
         <div>
           <label style={labelStyle}>Date *</label>
           <input type="date" value={event_date} onChange={e => setDate(e.target.value)} style={fieldStyle} />
@@ -118,6 +120,10 @@ function EventForm({ initial, onSave, onCancel }: { initial?: any; onSave: (data
           <select value={type} onChange={e => setType(e.target.value)} style={fieldStyle}>
             {EVENT_TYPES.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
           </select>
+        </div>
+        <div style={{ width: 80 }}>
+          <label style={labelStyle}>Hours</label>
+          <input type="number" step="0.25" min="0" value={hours} onChange={e => setHours(e.target.value)} placeholder="0" style={fieldStyle} />
         </div>
       </div>
       <div style={{ marginBottom: 10 }}>
@@ -179,7 +185,8 @@ export default function TimelinePage() {
 
   const filtered = search ? events.filter(e => e.title.toLowerCase().includes(search.toLowerCase()) || (e.description || '').toLowerCase().includes(search.toLowerCase())) : events;
   const grouped = groupByDate(filtered);
-  const totalByPlatform = PLATFORMS.filter(p => p.key !== 'all').map(p => ({ ...p, count: events.filter(e => e.platform === p.key).length })).filter(p => p.count > 0);
+  const totalByPlatform = PLATFORMS.filter(p => p.key !== 'all').map(p => ({ ...p, count: events.filter(e => e.platform === p.key).length, hours: events.filter(e => e.platform === p.key).reduce((s, e) => s + (e.hours || 0), 0) })).filter(p => p.count > 0);
+  const totalHours = events.reduce((s, e) => s + (e.hours || 0), 0);
 
   return (
     <div>
@@ -248,12 +255,18 @@ export default function TimelinePage() {
                 {totalByPlatform.map(p => (
                   <div key={p.key} onClick={() => setFilter(p.key)} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <span style={{ fontSize: 12, color: p.color, fontWeight: 600 }}>{p.label}</span>
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>{p.count}</span>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      {p.hours > 0 && <span style={{ fontSize: 10, color: '#a8cf45', opacity: 0.7 }}>{p.hours}h</span>}
+                      <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 16, textAlign: 'right' }}>{p.count}</span>
+                    </div>
                   </div>
                 ))}
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0 0' }}>
                   <span style={{ fontSize: 12, fontWeight: 700 }}>Total</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--pink)' }}>{events.length}</span>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {totalHours > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#a8cf45' }}>{totalHours}h</span>}
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--pink)' }}>{events.length}</span>
+                  </div>
                 </div>
               </div>
             </div>

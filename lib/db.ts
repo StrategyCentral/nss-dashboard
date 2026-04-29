@@ -73,6 +73,7 @@ function initSchema(db: any) {
       type TEXT NOT NULL DEFAULT 'general',
       title TEXT NOT NULL,
       description TEXT,
+      hours REAL,
       source TEXT DEFAULT 'manual',
       source_id TEXT,
       created_at TEXT DEFAULT (datetime('now'))
@@ -114,6 +115,12 @@ function initSchema(db: any) {
       for (const ch of defaults) stmt.run(ch.key, ch.name, ch.color, ch.icon, ch.sort_order);
     }
   } catch {}
+  // Migration: add hours column to timeline_events if missing
+  try {
+    db.prepare('SELECT hours FROM timeline_events LIMIT 1').get();
+  } catch {
+    try { db.exec('ALTER TABLE timeline_events ADD COLUMN hours REAL'); } catch {}
+  }
 }
 
 export function getOAuthToken(platform: string) {

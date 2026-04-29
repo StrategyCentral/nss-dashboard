@@ -28,13 +28,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { event_date, platform, type, title, description, source, source_id } = await req.json();
+  const { event_date, platform, type, title, description, hours, source, source_id } = await req.json();
   if (!event_date || !platform || !title) return NextResponse.json({ error: 'event_date, platform, title required' }, { status: 400 });
   try {
     const db = getDb();
     const result: any = db.prepare(
-      'INSERT INTO timeline_events (event_date, platform, type, title, description, source, source_id) VALUES (?,?,?,?,?,?,?)'
-    ).run(event_date, platform, type || 'general', title, description || null, source || 'manual', source_id || null);
+      'INSERT INTO timeline_events (event_date, platform, type, title, description, hours, source, source_id) VALUES (?,?,?,?,?,?,?,?)'
+    ).run(event_date, platform, type || 'general', title, description || null, hours || null, source || 'manual', source_id || null);
     return NextResponse.json({ ok: true, id: result.lastInsertRowid });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -44,12 +44,12 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const session = await getSession();
   if (!session || session.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { id, event_date, platform, type, title, description } = await req.json();
+  const { id, event_date, platform, type, title, description, hours } = await req.json();
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   try {
     const db = getDb();
-    db.prepare('UPDATE timeline_events SET event_date=?, platform=?, type=?, title=?, description=? WHERE id=?')
-      .run(event_date, platform, type, title, description || null, id);
+    db.prepare('UPDATE timeline_events SET event_date=?, platform=?, type=?, title=?, description=?, hours=? WHERE id=?')
+      .run(event_date, platform, type, title, description || null, hours || null, id);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
