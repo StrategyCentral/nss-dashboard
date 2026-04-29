@@ -1262,6 +1262,8 @@ export default function SeoPage() {
   const [saving, setSaving] = useState(false);
   const [source, setSource] = useState('demo');
   const [mainTab, setMainTab] = useState<'rankings'|'structure'|'links'>('rankings');
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
 
   useEffect(() => {
     loadKeywords();
@@ -1298,6 +1300,27 @@ export default function SeoPage() {
       setShowAddKw(false);
       loadKeywords();
     } finally { setSaving(false); }
+  }
+
+  async function syncGSC() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const r = await fetch('/api/gsc', { method: 'POST' });
+      const data = await r.json();
+      if (data.ok) {
+        setSyncResult(`✓ Synced ${data.queries_synced} keywords + ${data.pages_synced} pages from GSC`);
+        setSource('live');
+        loadKeywords();
+        loadStructure();
+        setTimeout(() => setSyncResult(null), 5000);
+      } else {
+        setSyncResult(`✗ ${data.error}`);
+      }
+    } catch (e: any) {
+      setSyncResult(`✗ ${e.message}`);
+    }
+    setSyncing(false);
   }
 
   const trendData = TREND_DATA[period];
@@ -1423,14 +1446,25 @@ export default function SeoPage() {
             <div className="section-title" style={{ fontSize: 15 }}>Keyword Rankings</div>
             <div className="section-sub">{filtered.length} keywords · {categories.length - 1} categories</div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input className="form-input" placeholder="Search keywords…" value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)} style={{ width: 180, padding: '6px 12px', fontSize: 12 }} />
+            <button onClick={syncGSC} disabled={syncing} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', color: '#a8cf45', borderColor: '#a8cf4544' }}>
+              {syncing ? '↻ Syncing…' : '↻ Sync GSC'}
+            </button>
             <button onClick={() => setShowAddKw(!showAddKw)} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}>
               + Add Keyword
             </button>
           </div>
         </div>
+        {syncResult && (
+          <div style={{ padding: '8px 14px', borderRadius: 8, marginBottom: 12, fontSize: 12, fontWeight: 600,
+            background: syncResult.startsWith('✓') ? 'rgba(168,207,69,0.1)' : 'rgba(255,80,80,0.1)',
+            color: syncResult.startsWith('✓') ? '#a8cf45' : '#ff5050',
+            border: `1px solid ${syncResult.startsWith('✓') ? '#a8cf4530' : '#ff505030'}` }}>
+            {syncResult}
+          </div>
+        )}
 
         {showAddKw && (
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
