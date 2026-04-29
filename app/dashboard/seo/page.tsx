@@ -14,16 +14,16 @@ const PERIODS = [
 const NODE_COLORS: Record<string, string> = {
   home: '#ff1e8e', silo: '#a8cf45', category: '#04aae8',
   post: '#ffe600', 'sa-post': '#f97316', 'sa-cluster': '#e879f9', page: '#a78bfa',
-  'location-page': '#22d3ee', product: '#ff8c42', 'product-cat': '#c084fc', shop: '#fbbf24',
+  'location-page': '#22d3ee', product: '#ff8c42', 'product-cat': '#c084fc', shop: '#fbbf24', blog: '#34d399',
 };
 
 const NODE_TYPE_LABELS: Record<string, string> = {
   home: 'Home', silo: 'Silo', category: 'Category',
   post: 'Blog Post', 'sa-post': 'SA Post', 'sa-cluster': 'SA Cluster', page: 'Page',
-  'location-page': 'Location Page', product: 'Product', 'product-cat': 'Product Category', shop: 'Shop',
+  'location-page': 'Location Page', product: 'Product', 'product-cat': 'Product Category', shop: 'Shop', blog: 'Blog',
 };
 
-const ALL_TYPES = ['home', 'shop', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
+const ALL_TYPES = ['home', 'shop', 'blog', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
 
 const TREND_DATA: Record<string, any[]> = {
   '7d': [
@@ -666,7 +666,7 @@ function SiteStructureVisualiser({ nodes, links, keywords, onRefresh }: any) {
     onRefresh();
   }
 
-  const typeOrder = ['home', 'shop', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
+  const typeOrder = ['home', 'shop', 'blog', 'silo', 'category', 'post', 'sa-post', 'sa-cluster', 'page', 'location-page', 'product-cat', 'product'];
 
   function getChildren(parentId: string) {
     return nodes.filter((n: any) => n.parent === parentId);
