@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getOAuthToken, saveOAuthToken } from '@/lib/db';
+import { getOAuthToken } from '@/lib/db';
 
 export async function GET() {
   const session = await getSession();
@@ -9,7 +9,7 @@ export async function GET() {
   const token = getOAuthToken('google');
   if (!token) return NextResponse.json({ error: 'No token' });
 
-  // Refresh token
+  // Refresh
   let accessToken = token.access_token as string;
   if (token.refresh_token) {
     const rr = await fetch('https://oauth2.googleapis.com/token', {
@@ -24,33 +24,30 @@ export async function GET() {
     });
     const rd = await rr.json() as Record<string, unknown>;
     if (rd.access_token) accessToken = rd.access_token as string;
+    console.log('[GADS DEBUG] Refresh scopes from Google:', rd.scope);
   }
+
+  // Check actual token scopes via tokeninfo
+  const tiRes = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${accessToken}`);
+  const tiData = await tiRes.json() as Record<string, unknown>;
 
   const devToken = (process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '').trim();
 
-  // Test: listAccessibleCustomers - no customer ID needed
-  const r1 = await fetch('https://googleads.googleapis.com/v20/customers:listAccessibleCustomers', {
+  // Try listAccessibleCustomers
+  const lacRes = await fetch('https://googleads.googleapis.com/v20/customers:listAccessibleCustomers', {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'developer-token': devToken,
     },
   });
-  const b1 = await r1.text();
-
-  // Test with manager ID header
-  const r2 = await fetch('https://googleads.googleapis.com/v20/customers:listAccessibleCustomers', {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'developer-token': devToken,
-      'login-customer-id': '5071931020',
-    },
-  });
-  const b2 = await r2.text();
+  const lacBody = await lacRes.text();
 
   return NextResponse.json({
-    token_prefix: accessToken.substring(0, 30),
-    dev_token_len: devToken.length,
-    without_manager: { status: r1.status, body: b1.substring(0, 400) },
-    with_manager: { status: r2.status, body: b2.substring(0, 400) },
+    stored_scope: token.scope,
+    tokeninfo_scope: tiData.scope,
+    tokeninfo_email: tiData.email,
+    tokeninfo_has_adwords: ((tiData.scope as string) || '').includes('adwords'),
+    ads_status: lacRes.status,
+    ads_error: lacBody.substring(0, 300),
   });
 }
