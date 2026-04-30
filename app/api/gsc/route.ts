@@ -173,32 +173,58 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Clean up duplicate keywords in existing table before adding unique index
+    try {
+      db.exec(`DELETE FROM seo_keywords WHERE id NOT IN (
+        SELECT MIN(id) FROM seo_keywords GROUP BY keyword
+      )`);
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_kw_keyword ON seo_keywords(keyword)');
+    } catch {
+      // If index still fails, drop and recreate
+      try {
+        db.exec('DROP INDEX IF EXISTS idx_kw_keyword');
+        db.exec(`DELETE FROM seo_keywords WHERE id NOT IN (
+          SELECT MIN(id) FROM seo_keywords GROUP BY keyword
+        )`);
+        db.exec('CREATE UNIQUE INDEX idx_kw_keyword ON seo_keywords(keyword)');
+      } catch { /* proceed without upsert */ }
+    }
+
     // Upsert into keywords table
-    const upsert = db.prepare(`
-      INSERT INTO seo_keywords (keyword, position, prev_position, volume, url, category, trend)
-      VALUES (?, ?, NULL, ?, ?, 'GSC', 'flat')
-      ON CONFLICT(keyword) DO UPDATE SET
-        prev_position = seo_keywords.position,
-        position = excluded.position,
-        volume = excluded.volume,
-        url = excluded.url,
-        trend = CASE 
-          WHEN seo_keywords.position IS NULL THEN 'flat'
-          WHEN excluded.position < seo_keywords.position THEN 'up'
-          WHEN excluded.position > seo_keywords.position THEN 'down'
-          ELSE 'flat'
-        END
-    `);
-
-    // Add unique constraint on keyword if not exists
-    try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_kw_keyword ON seo_keywords(keyword)'); } catch { }
-
     let synced = 0;
+    const hasUniqueIndex = (() => {
+      try {
+        const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_kw_keyword'").get();
+        return !!idx;
+      } catch { return false; }
+    })();
+
     const syncMany = db.transaction(() => {
       for (const [query, row] of bestByQuery) {
         const pos = Math.round(row.position);
-        // Use impressions as proxy for volume (GSC doesn't give search volume)
-        upsert.run(query, pos, row.impressions, row.url);
+        if (hasUniqueIndex) {
+          db.prepare(`
+            INSERT INTO seo_keywords (keyword, position, prev_position, volume, url, category, trend)
+            VALUES (?, ?, NULL, ?, ?, 'GSC', 'flat')
+            ON CONFLICT(keyword) DO UPDATE SET
+              prev_position = seo_keywords.position,
+              position = excluded.position,
+              volume = excluded.volume,
+              url = excluded.url,
+              trend = CASE 
+                WHEN seo_keywords.position IS NULL THEN 'flat'
+                WHEN excluded.position < seo_keywords.position THEN 'up'
+                WHEN excluded.position > seo_keywords.position THEN 'down'
+                ELSE 'flat'
+              END
+          `).run(query, pos, row.impressions, row.url);
+        } else {
+          // Fallback: delete + insert
+          db.prepare('DELETE FROM seo_keywords WHERE keyword = ?').run(query);
+          db.prepare('INSERT INTO seo_keywords (keyword, position, volume, url, category, trend) VALUES (?, ?, ?, ?, ?, ?)').run(
+            query, pos, row.impressions, row.url, 'GSC', 'flat'
+          );
+        }
         synced++;
       }
     });
