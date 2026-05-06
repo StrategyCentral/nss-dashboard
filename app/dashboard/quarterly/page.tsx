@@ -34,7 +34,7 @@ export default function QuarterlyPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h1 className="section-title" style={{ fontSize: 26 }}>Quarterly Revenue</h1>
-          <p className="section-sub">Revenue vs ad spend by quarter — Facebook & Google isolated</p>
+          <p className="section-sub">Revenue vs ad spend by quarter — Meta & Google isolated</p>
         </div>
         {source === 'demo' && <span className="badge badge-demo">Demo Data</span>}
       </div>
@@ -71,7 +71,7 @@ export default function QuarterlyPage() {
       ) : (
         <div className="grid-2" style={{ marginBottom: 20 }}>
           <div className="card">
-            <div style={{ marginBottom: 14, color: 'var(--blue)', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 14 }}>Facebook Ads</div>
+            <div style={{ marginBottom: 14, color: 'var(--blue)', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 14 }}>Meta Ads</div>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={data.quarters} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />

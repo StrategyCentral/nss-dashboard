@@ -17,7 +17,7 @@ export const SEO_DEMO = {
   clicks: 3842, impressions: 48200, ctr: 7.97, avgPos: 4.9,
 };
 
-// ── Facebook Ads Demo ─────────────────────────────────────────────────────────
+// ── Meta Ads Demo ─────────────────────────────────────────────────────────
 export const FACEBOOK_DEMO = {
   spend: 4820,
   revenue: 21480,
@@ -98,7 +98,7 @@ export const OVERALL_DEMO = {
   total_revenue: 106380,
   overall_roas: 5.52,
   channels: [
-    { name: 'Facebook Ads', spend: 4820, revenue: 21480, roas: 4.46 },
+    { name: 'Meta Ads', spend: 4820, revenue: 21480, roas: 4.46 },
     { name: 'Google Ads', spend: 3640, revenue: 18200, roas: 5.00 },
     { name: 'SEO', spend: 1600, revenue: 12800, roas: 8.00 },
     { name: 'Organic / Direct', spend: 0, revenue: 53900, roas: 0 },

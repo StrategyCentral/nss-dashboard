@@ -299,7 +299,7 @@ function AdsetDetailView({ adsetName, ageBreakdown, genderBreakdown }: { adsetNa
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => router.push('/dashboard/facebook')} className="btn btn-ghost" style={{ fontSize: 12 }}>← Back</button>
+        <button onClick={() => router.push('/dashboard/meta-ads')} className="btn btn-ghost" style={{ fontSize: 12 }}>← Back</button>
         <div style={{ fontSize: 12, color: 'var(--muted)' }}>{adset.campaign} /</div>
         <div style={{ fontSize: 15, fontWeight: 700 }}>{adset.name}</div>
       </div>
@@ -464,7 +464,7 @@ function LifetimePerformance({ data }: { data: any }) {
 }
 
 // ── Main Export ───────────────────────────────────────────────────────────────
-export default function FacebookPage() {
+export default function MetaAdsPage() {
   const router = useRouter();
   const [adsetView, setAdsetView] = useState<string | null>(null);
   const [fbData, setFbData] = useState<any>(null);
@@ -540,7 +540,7 @@ export default function FacebookPage() {
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <h1 className="section-title" style={{ fontSize: 26 }}>Facebook Ads</h1>
+          <h1 className="section-title" style={{ fontSize: 26 }}>Meta Ads</h1>
           <p className="section-sub">
             {isCombined && periods.length > 0
               ? `${periods.length} month${periods.length > 1 ? 's' : ''} loaded: ${periods.join(', ')} · Campaign + demographics + daily`

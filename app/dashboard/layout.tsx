@@ -3,24 +3,27 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 
+// Canonical sidebar — see brain doc:
+// PROJECTS/ACE BUSINESS SUITE/ace-business-suite-architecture.md §4.1
+// Sub-tabs (Overview > Overall ROI / Revenue Attribution / etc; SEO > Rankings / Link Monitor / etc)
+// are rendered as top-of-page tabs inside each section, not in this sidebar.
 const NAV = [
-  { href: '/dashboard', icon: '◈', label: 'Overview' },
-  { href: '/dashboard/seo', icon: '◎', label: 'SEO' },
-  { href: '/dashboard/facebook', icon: 'f', label: 'Facebook Ads' },
-  { href: '/dashboard/google', icon: 'G', label: 'Google Ads' },
-  { href: '/dashboard/youtube-ads', icon: '▶', label: 'YouTube Ads' },
-  { href: '/dashboard/revenue', icon: '◉', label: 'Revenue Attribution' },
-  { href: '/dashboard/quarterly', icon: '◫', label: 'Quarterly Revenue' },
-  { href: '/dashboard/seo-roi', icon: '$', label: 'SEO ROI' },
-  { href: '/dashboard/overall', icon: '⊕', label: 'Overall ROI' },
-  { href: '/dashboard/timeline', icon: '◷', label: 'Timeline' },
+  { href: '/dashboard',                 icon: '◈', label: 'Overview' },
+  { href: '/dashboard/timeline',        icon: '◷', label: 'Timeline' },
+  { href: '/dashboard/money-map',       icon: '⌖', label: 'Money Map' },
+  { href: '/dashboard/seo',             icon: '◎', label: 'SEO' },
+  { href: '/dashboard/meta-ads',        icon: 'M', label: 'Meta Ads' },
+  { href: '/dashboard/google-ads',      icon: 'G', label: 'Google Ads' },
+  { href: '/dashboard/tiktok-ads',      icon: '♪', label: 'TikTok Ads' },
+  { href: '/dashboard/reddit-ads',      icon: 'R', label: 'Reddit Ads' },
+  { href: '/dashboard/pinterest-ads',   icon: 'P', label: 'Pinterest Ads' },
 ];
 const ADMIN = [
-  { href: '/admin/connections', icon: '⟳', label: 'Connections' },
-  { href: '/admin/attribution', icon: '⊞', label: 'Attribution Backfill' },
-  { href: '/admin/margins', icon: '%', label: 'Product Margins' },
-  { href: '/admin/users', icon: '◉', label: 'Users' },
-  { href: '/admin/seo-costs', icon: '⊞', label: 'SEO Costs' },
+  { href: '/admin/connections',  icon: '⟳', label: 'Connections' },
+  { href: '/admin/attribution',  icon: '⊞', label: 'Attribution Backfill' },
+  { href: '/admin/margins',      icon: '%', label: 'Product Margins' },
+  { href: '/admin/users',        icon: '◉', label: 'Users' },
+  { href: '/admin/seo-costs',    icon: '⊞', label: 'SEO Costs' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +32,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    // check session
     fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => {
       if (!d) { router.push('/'); return; }
       setRole(d.role);
@@ -72,7 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav */}
         <nav style={{ flex: 1, overflowY: 'auto', paddingBottom: 12 }}>
-          <div style={{ fontSize: 10, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: '0.1em', color: 'var(--muted)', padding: '12px 14px 4px', textTransform: 'uppercase' }}>Reports</div>
+          <div style={{ fontSize: 10, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: '0.1em', color: 'var(--muted)', padding: '12px 14px 4px', textTransform: 'uppercase' }}>Marketing Suite</div>
           {NAV.map(item => (
             <Link key={item.href} href={item.href} className={`nav-item${isActive(item.href) ? ' active' : ''}`}
               style={isActive(item.href) ? { background: 'rgba(231,37,141,0.12)', color: 'var(--pink)' } : {}}>
