@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { getDb } from '@/lib/db';
+import { getSession } from '../../../../lib/auth';
+import { getDb } from '../../../../lib/db';
 
 const SENSITIVE = ['secret', 'token', 'json', 'key', 'password'];
 const isSensitive = (s: string) => SENSITIVE.some(k => s.includes(k));
