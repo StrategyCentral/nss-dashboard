@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import ArticleWriterTab from './_article-writer';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1261,7 +1262,7 @@ export default function SeoPage() {
   const [addKwForm, setAddKwForm] = useState({ keyword: '', url: '', category: 'Waxing', volume: '', position: '' });
   const [saving, setSaving] = useState(false);
   const [source, setSource] = useState('demo');
-  const [mainTab, setMainTab] = useState<'rankings'|'structure'|'links'>('rankings');
+  const [mainTab, setMainTab] = useState<'rankings'|'structure'|'links'|'articles'>('rankings');
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
 
@@ -1370,6 +1371,7 @@ export default function SeoPage() {
         <button style={TAB_STYLE(mainTab === 'rankings', '#a8cf45')} onClick={() => setMainTab('rankings')}>◎ Rankings</button>
         <button style={TAB_STYLE(mainTab === 'structure', '#04aae8')} onClick={() => setMainTab('structure')}>⊞ Site Structure</button>
         <button style={TAB_STYLE(mainTab === 'links', '#ff1e8e')} onClick={() => setMainTab('links')}>🔗 Link Monitor</button>
+        <button style={TAB_STYLE(mainTab === 'articles', '#ffe600')} onClick={() => setMainTab('articles')}>✎ Article Writer</button>
       </div>
 
       {/* Rankings Tab */}
@@ -1572,6 +1574,9 @@ export default function SeoPage() {
 
       {/* Link Monitor Tab */}
       {mainTab === 'links' && <LinkMonitorTab />}
+
+      {/* Article Writer Tab */}
+      {mainTab === 'articles' && <ArticleWriterTab />}
 
     </div>
   );
