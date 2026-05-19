@@ -92,6 +92,50 @@ function initSchema(db: any) {
       notes TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS brand_voices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      voice_tone TEXT,
+      style TEXT,
+      vocabulary TEXT,
+      avoid_phrases TEXT,
+      example_text TEXT,
+      is_default INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS articles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      keyword TEXT,
+      page_type TEXT NOT NULL DEFAULT 'super_page',
+      content_html TEXT,
+      content_md TEXT,
+      meta_description TEXT,
+      source_text TEXT,
+      brand_voice_id INTEGER,
+      serp_data TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      wp_post_id INTEGER,
+      wp_url TEXT,
+      wp_site TEXT,
+      word_count INTEGER DEFAULT 0,
+      published_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS generation_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      article_id INTEGER,
+      job_type TEXT NOT NULL,
+      prompt TEXT,
+      model TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      error TEXT,
+      tokens_used INTEGER,
+      created_at TEXT DEFAULT (datetime('now')),
+      completed_at TEXT
+    );
   `);
   try {
     const count = (db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c;
@@ -113,6 +157,13 @@ function initSchema(db: any) {
       ];
       const stmt = db.prepare('INSERT OR IGNORE INTO budget_channels (key, name, color, icon, sort_order) VALUES (?,?,?,?,?)');
       for (const ch of defaults) stmt.run(ch.key, ch.name, ch.color, ch.icon, ch.sort_order);
+    }
+  } catch {}
+  try {
+    const bvCount = (db.prepare('SELECT COUNT(*) as c FROM brand_voices').get() as any).c;
+    if (bvCount === 0) {
+      db.prepare('INSERT INTO brand_voices (name, voice_tone, style, is_default) VALUES (?,?,?,1)')
+        .run('NSS Default', 'Friendly, expert, helpful — speaks to salon professionals', 'Conversational with practical detail');
     }
   } catch {}
   // Migration: add hours column to timeline_events if missing
