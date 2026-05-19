@@ -1,11 +1,12 @@
 [variables]
 NEXT_TELEMETRY_DISABLED = "1"
+NPM_CONFIG_PRODUCTION = "false"
 
 [phases.setup]
 nixPkgs = ["nodejs_20", "python3"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm install --include=dev"]
 
 [phases.build]
 cmds = ["rm -rf .next/cache/* 2>/dev/null || true", "npm run build"]
