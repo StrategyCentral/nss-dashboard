@@ -166,6 +166,22 @@ function initSchema(db: any) {
         .run('NSS Default', 'Friendly, expert, helpful — speaks to salon professionals', 'Conversational with practical detail');
     }
   } catch {}
+  // uploaded_data (CSV uploads) table + migrations for older volumes
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS uploaded_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform TEXT NOT NULL,
+      level TEXT NOT NULL DEFAULT 'campaign',
+      report_type TEXT NOT NULL DEFAULT 'performance',
+      data TEXT NOT NULL,
+      filename TEXT,
+      period TEXT,
+      uploaded_at TEXT DEFAULT (datetime('now'))
+    )`);
+  } catch {}
+  try { db.exec(`ALTER TABLE uploaded_data ADD COLUMN level TEXT NOT NULL DEFAULT 'campaign'`); } catch {}
+  try { db.exec(`ALTER TABLE uploaded_data ADD COLUMN report_type TEXT NOT NULL DEFAULT 'performance'`); } catch {}
+  try { db.exec(`ALTER TABLE uploaded_data ADD COLUMN period TEXT`); } catch {}
   // Migration: add hours column to timeline_events if missing
   try {
     db.prepare('SELECT hours FROM timeline_events LIMIT 1').get();
