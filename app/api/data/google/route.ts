@@ -128,7 +128,7 @@ async function fetchGoogleAdsData(accessToken: string, clientCid: string, manage
       revenue: Math.round(revenue),
       roas: spend > 0 ? parseFloat((revenue / spend).toFixed(2)) : 0,
       conversions: Math.round(r.metrics?.conversions || 0),
-      clicks: r.metrics?.clicks || 0,
+      clicks: Number(r.metrics?.clicks || 0),
       cpc: parseFloat(((r.metrics?.averageCpc || 0) / 1_000_000).toFixed(2)),
     };
   });
@@ -152,7 +152,7 @@ async function fetchGoogleAdsData(accessToken: string, clientCid: string, manage
   const monthly = Object.entries(monthMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, v]) => ({
-      month: new Date(key + '-01').toLocaleString('default', { month: 'short' }),
+      month: new Date(key).toLocaleString('default', { month: 'short' }),
       spend: Math.round(v.spend),
       revenue: Math.round(v.revenue),
     }));
