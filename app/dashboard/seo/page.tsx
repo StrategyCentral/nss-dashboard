@@ -2,6 +2,9 @@
 import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import ArticleWriterTab from './_article-writer';
+import SiteAuditTab from './_site-audit';
+import { KeywordResearchTab, BacklinkProfileTab } from './_research';
+import RankTrackerTab from './_rank-tracker';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1262,13 +1265,15 @@ export default function SeoPage() {
   const [addKwForm, setAddKwForm] = useState({ keyword: '', url: '', category: 'Waxing', volume: '', position: '' });
   const [saving, setSaving] = useState(false);
   const [source, setSource] = useState('demo');
-  const [mainTab, setMainTab] = useState<'rankings'|'structure'|'links'|'articles'>('rankings');
+  const [mainTab, setMainTab] = useState<'rankings'|'structure'|'links'|'articles'|'audit'|'research'|'backlinks'|'tracker'>('rankings');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
 
   useEffect(() => {
     loadKeywords();
     loadStructure();
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => setIsAdmin(d?.role === 'admin')).catch(() => {});
   }, []);
 
   async function loadKeywords() {
@@ -1361,14 +1366,18 @@ export default function SeoPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <h1 className="section-title" style={{ fontSize: 26 }}>SEO</h1>
-          <p className="section-sub">Rankings, site structure, backlink monitoring</p>
+          <p className="section-sub">Rankings, rank tracking, site audit, keyword research, backlinks, site structure</p>
         </div>
         {source === 'demo' && <span className="badge badge-demo">Demo Data</span>}
       </div>
 
       {/* Top-level tab nav */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         <button style={TAB_STYLE(mainTab === 'rankings', '#a8cf45')} onClick={() => setMainTab('rankings')}>◎ Rankings</button>
+        <button style={TAB_STYLE(mainTab === 'tracker', '#a8cf45')} onClick={() => setMainTab('tracker')}>↕ Rank Tracker</button>
+        <button style={TAB_STYLE(mainTab === 'audit', '#04aae8')} onClick={() => setMainTab('audit')}>✓ Site Audit</button>
+        <button style={TAB_STYLE(mainTab === 'research', '#ffe600')} onClick={() => setMainTab('research')}>⌕ Keyword Research</button>
+        <button style={TAB_STYLE(mainTab === 'backlinks', '#ff1e8e')} onClick={() => setMainTab('backlinks')}>⇄ Backlink Profile</button>
         <button style={TAB_STYLE(mainTab === 'structure', '#04aae8')} onClick={() => setMainTab('structure')}>⊞ Site Structure</button>
         <button style={TAB_STYLE(mainTab === 'links', '#ff1e8e')} onClick={() => setMainTab('links')}>🔗 Link Monitor</button>
         <button style={TAB_STYLE(mainTab === 'articles', '#ffe600')} onClick={() => setMainTab('articles')}>✎ Article Writer</button>
@@ -1577,6 +1586,12 @@ export default function SeoPage() {
 
       {/* Article Writer Tab */}
       {mainTab === 'articles' && <ArticleWriterTab />}
+
+      {/* ACE SEO tools. Kept mounted once opened would be nicer, but each loads its own saved data on open. */}
+      {mainTab === 'tracker' && <RankTrackerTab />}
+      {mainTab === 'audit' && <SiteAuditTab isAdmin={isAdmin} />}
+      {mainTab === 'research' && <KeywordResearchTab />}
+      {mainTab === 'backlinks' && <BacklinkProfileTab />}
 
     </div>
   );

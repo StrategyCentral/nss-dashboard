@@ -88,6 +88,17 @@ const WOOCOMMERCE_SECTION = {
   ],
 };
 
+// Paid SEO data (keyword research, backlink profile, rank tracker). The site audit does not need it.
+const DATAFORSEO_SECTION = {
+  color: '#A8CF45',
+  bg: 'rgba(168,207,69,0.08)',
+  border: 'rgba(168,207,69,0.25)',
+  fields: [
+    { key: 'dataforseo_login', label: 'API Login', hint: 'abc123xyz…', note: 'DataForSEO → API Access → API login', secret: false },
+    { key: 'dataforseo_password', label: 'API Password', hint: '16 characters', note: 'The API password on the same page, not your dashboard password', secret: true },
+  ],
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function ConnectedBadge() {
@@ -243,6 +254,7 @@ function ConnectionsPage() {
   // Count configured fields per section
   const googleConfigured = GOOGLE_SECTION.properties.filter(p => savedKeys[p.key]).length;
   const wooConfigured = WOOCOMMERCE_SECTION.fields.filter(f => savedKeys[f.key]).length;
+  const seoDataConfigured = DATAFORSEO_SECTION.fields.filter(f => savedKeys[f.key]).length;
 
   return (
     <div>
@@ -496,6 +508,58 @@ function ConnectionsPage() {
                 <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12, marginBottom: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Credentials</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {WOOCOMMERCE_SECTION.fields.map(f => (
+                    <FieldRow key={f.key} fkey={f.key} label={f.label} hint={f.hint} note={f.note} secret={f.secret} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── DATAFORSEO ── */}
+      <div style={{ marginBottom: 8, fontSize: 11, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: '0.1em', color: 'var(--muted)', textTransform: 'uppercase', padding: '0 2px' }}>SEO Data</div>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 24px' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 10, background: DATAFORSEO_SECTION.bg, border: `1px solid ${DATAFORSEO_SECTION.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: DATAFORSEO_SECTION.color, fontSize: 20 }}>
+            ◎
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 800, fontSize: 15 }}>DataForSEO</span>
+              {seoDataConfigured === DATAFORSEO_SECTION.fields.length ? <ConnectedBadge /> : <NotConnectedBadge />}
+              <ConfiguredPill count={seoDataConfigured} total={DATAFORSEO_SECTION.fields.length} />
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Keyword research, backlink profile and rank tracking. Billed per lookup; the site audit is free and does not need it.</div>
+          </div>
+          <button onClick={() => setExpanded(e => ({ ...e, dataforseo: !e.dataforseo }))} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', flexShrink: 0 }}>
+            {expanded.dataforseo ? '✕ Done' : seoDataConfigured > 0 ? '✎ Edit' : '⚙ Set Up'}
+          </button>
+        </div>
+
+        {expanded.dataforseo && (
+          <div style={{ borderTop: '1px solid var(--border)', padding: '20px 24px', background: 'rgba(255,255,255,0.02)' }}>
+            <div className="grid-2" style={{ gap: 24 }}>
+              <div>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12, marginBottom: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>How to get the API login</div>
+                <ol style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {[
+                    'Sign in at app.dataforseo.com (pay-as-you-go, US$50 minimum top-up)',
+                    'Open API Access in the left menu',
+                    'Copy the API login and the API password',
+                    'Typical cost: about US$0.02 a keyword lookup, US$0.10 a backlink profile, US$0.01 a rank check',
+                  ].map((step, i) => (
+                    <li key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12 }}>
+                      <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(168,207,69,0.15)', color: '#A8CF45', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
+                      <span style={{ color: 'var(--muted)', lineHeight: 1.5 }}>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12, marginBottom: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Credentials</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {DATAFORSEO_SECTION.fields.map(f => (
                     <FieldRow key={f.key} fkey={f.key} label={f.label} hint={f.hint} note={f.note} secret={f.secret} />
                   ))}
                 </div>
