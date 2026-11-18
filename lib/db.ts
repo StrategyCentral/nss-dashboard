@@ -24,6 +24,10 @@ function openAccountDb(accountId: number) {
     const Database = require('better-sqlite3');
     const path = require('path');
     const fs = require('fs');
+    // Production must point at the persistent volume; /tmp would silently lose every account.
+    if (!process.env.DATA_DIR && process.env.NODE_ENV === 'production') {
+      throw new Error('DATA_DIR is not set; refusing to open a throwaway database in production');
+    }
     const DATA_DIR = process.env.DATA_DIR || '/tmp/nss-data';
     const primary = accountId === PRIMARY_ACCOUNT_ID;
     const DB_PATH = path.join(DATA_DIR, primary ? 'nss.db' : `account-${accountId}.db`);
@@ -31,13 +35,39 @@ function openAccountDb(accountId: number) {
     const db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
     initSchema(db, primary);
-    if (primary) initPlatformSchema(db);
+    if (primary) { initPlatformSchema(db); retireLegacyDefaultPassword(db); }
     _dbs.set(accountId, db);
     return db;
   } catch (e: any) {
     // Only a failure to open the primary file is fatal for the whole process.
     if (accountId === PRIMARY_ACCOUNT_ID) _dbError = e.message;
     throw e;
+  }
+}
+
+// The old code seeded admin@nss.com.au with a password that is public in git
+// history. If any admin login still uses it, replace it from
+// NSS_ADMIN_RESET_PASSWORD, or warn loudly. The password is never logged.
+const LEGACY_DEFAULT_PASSWORD = 'nss2024!';
+
+function retireLegacyDefaultPassword(db: any) {
+  try {
+    const bcrypt = require('bcryptjs');
+    const rows = db.prepare(
+      "SELECT id, password_hash FROM users WHERE role = 'admin' OR lower(email) = 'admin@nss.com.au'"
+    ).all() as { id: number; password_hash: string }[];
+    const reset = process.env.NSS_ADMIN_RESET_PASSWORD;
+    for (const r of rows) {
+      if (!r.password_hash || !bcrypt.compareSync(LEGACY_DEFAULT_PASSWORD, r.password_hash)) continue;
+      if (reset && reset.length >= 12 && reset !== LEGACY_DEFAULT_PASSWORD) {
+        db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(reset, 10), r.id);
+        console.warn(`[security] default password replaced for user id ${r.id} from NSS_ADMIN_RESET_PASSWORD`);
+      } else {
+        console.warn(`[security] user id ${r.id} still uses the old default password. Set NSS_ADMIN_RESET_PASSWORD (12+ chars) and restart, or change it under Change Password.`);
+      }
+    }
+  } catch (e) {
+    console.error('[security] legacy default password check failed', e);
   }
 }
 
@@ -244,10 +274,15 @@ function initSchema(db: any, primary: boolean) {
   try {
     const count = (db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c;
     // Logins live in the primary file only; other account files never get a seeded user.
-    if (primary && count === 0) {
+    // First-run admin seed: ONLY from env. No hard-coded credentials.
+    const seedEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+    const seedPassword = process.env.ADMIN_PASSWORD;
+    if (primary && count === 0 && seedEmail && seedPassword) {
       const bcrypt = require('bcryptjs');
-      const hash = bcrypt.hashSync('nss2024!', 10);
-      db.prepare('INSERT INTO users (email, password_hash, role) VALUES (?,?,?)').run('admin@nss.com.au', hash, 'admin');
+      const hash = bcrypt.hashSync(seedPassword, 10);
+      db.prepare('INSERT INTO users (email, password_hash, role) VALUES (?,?,?)').run(seedEmail, hash, 'admin');
+    } else if (primary && count === 0) {
+      console.warn('[db] users table is empty and ADMIN_EMAIL/ADMIN_PASSWORD are not set; skipping admin seed');
     }
   } catch {}
   try {

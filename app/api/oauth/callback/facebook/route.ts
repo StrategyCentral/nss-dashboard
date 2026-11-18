@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkOAuthCallback, oauthRedirect } from '@/lib/oauth-state';
 import { saveOAuthToken } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
@@ -8,8 +9,13 @@ export async function GET(req: NextRequest) {
 
   const baseUrl = process.env.NEXTAUTH_URL || '';
 
+  // Only an admin who started this flow here may complete it (CSRF / account-binding guard).
+  const guard = await checkOAuthCallback(req, 'facebook');
+  if (guard) return oauthRedirect(`${baseUrl}/admin/connections?error=facebook_${guard}`, 'facebook');
+
+
   if (error || !code) {
-    return NextResponse.redirect(`${baseUrl}/admin/connections?error=facebook_denied`);
+    return oauthRedirect(`${baseUrl}/admin/connections?error=facebook_denied`, 'facebook');
   }
 
   try {
@@ -20,7 +26,7 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      return NextResponse.redirect(`${baseUrl}/admin/connections?error=facebook_token`);
+      return oauthRedirect(`${baseUrl}/admin/connections?error=facebook_token`, 'facebook');
     }
 
     // Exchange for long-lived token
@@ -46,9 +52,9 @@ export async function GET(req: NextRequest) {
       extra_data: JSON.stringify({ ad_accounts: adAccounts }),
     });
 
-    return NextResponse.redirect(`${baseUrl}/admin/connections?success=facebook`);
+    return oauthRedirect(`${baseUrl}/admin/connections?success=facebook`, 'facebook');
   } catch (e: any) {
     console.error('Facebook OAuth error:', e);
-    return NextResponse.redirect(`${baseUrl}/admin/connections?error=facebook_error`);
+    return oauthRedirect(`${baseUrl}/admin/connections?error=facebook_error`, 'facebook');
   }
 }

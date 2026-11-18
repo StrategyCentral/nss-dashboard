@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { safeFetch } from '@/lib/safe-fetch';
 
 const CHECK_STALE_HOURS = 24;
 const FETCH_TIMEOUT_MS = 12000;
@@ -23,11 +24,11 @@ async function checkLink(link: any): Promise<{
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     let resp: Response;
     try {
-      resp = await fetch(link.source_url, {
+      // SSRF guard: public addresses only; redirects re-checked hop by hop.
+      resp = await safeFetch(String(link.source_url || ''), {
         signal: controller.signal,
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ACE-Marketing-Suite/1.0)' },
-        redirect: 'follow',
-      });
+      }, { allowHttp: true, maxRedirects: 5 });
     } finally {
       clearTimeout(timer);
     }

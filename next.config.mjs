@@ -8,7 +8,15 @@ const nextConfig = {
   async headers() {
     const hub = process.env.HUB_ORIGIN || 'https://dashboard.acetradingbots.com';
     const dev = process.env.NODE_ENV !== 'production' ? ' http://localhost:* http://127.0.0.1:*' : '';
-    return [{ source: '/:path*', headers: [{ key: 'Content-Security-Policy', value: `frame-ancestors 'self' ${hub}${dev}` }] }];
+    return [{
+      source: '/:path*',
+      headers: [
+        { key: 'Content-Security-Policy', value: `frame-ancestors 'self' ${hub}${dev}` },
+        { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      ],
+    }];
   },
   async redirects() {
     return [

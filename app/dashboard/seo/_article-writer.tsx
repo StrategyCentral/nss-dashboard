@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Article = {
@@ -89,6 +90,8 @@ function ArticlePreview({
   const [title, setTitle] = useState(article.title);
   const [meta, setMeta] = useState(article.meta_description || '');
   const [html, setHtml] = useState(article.content_html || '');
+  // Sanitized once per change; memoised so React does not re-set innerHTML on every render.
+  const previewHtml = useMemo(() => ({ __html: html ? sanitizeHtml(html) : '<em>No content</em>' }), [html]);
   const [saving, setSaving] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [pubSite, setPubSite] = useState<'main' | 'beauty'>('beauty');
@@ -160,7 +163,7 @@ function ArticlePreview({
         ) : (
           <div
             style={{ background: '#fff', color: '#222', padding: '24px 28px', borderRadius: 8, maxHeight: 600, overflow: 'auto', lineHeight: 1.6 }}
-            dangerouslySetInnerHTML={{ __html: html || '<em>No content</em>' }}
+            dangerouslySetInnerHTML={previewHtml}
           />
         )}
       </div>
