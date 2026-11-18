@@ -1,27 +1,131 @@
-let _db: any = null;
+/**
+ * Storage. ACE Marketing Suite keeps one SQLite file per customer account, so
+ * one customer's ads, orders, keys and SEO data can never leak into another's.
+ *
+ *   account 1  -> $DATA_DIR/nss.db          (the original file: National Salon
+ *                                            Supplies, the first customer. It
+ *                                            also holds the platform tables:
+ *                                            users + accounts.)
+ *   account N  -> $DATA_DIR/account-N.db
+ *
+ * getDb()         the signed-in user's account (what every data route wants)
+ * getPlatformDb() users + accounts, whoever is asking
+ */
+const _dbs = new Map<number, any>();
 let _dbError: string | null = null;
 
-export function getDb() {
-  if (_db) return _db;
+export const PRIMARY_ACCOUNT_ID = 1;
+
+function openAccountDb(accountId: number) {
+  const cached = _dbs.get(accountId);
+  if (cached) return cached;
   if (_dbError) throw new Error(_dbError);
   try {
     const Database = require('better-sqlite3');
     const path = require('path');
     const fs = require('fs');
     const DATA_DIR = process.env.DATA_DIR || '/tmp/nss-data';
-    const DB_PATH = path.join(DATA_DIR, 'nss.db');
+    const primary = accountId === PRIMARY_ACCOUNT_ID;
+    const DB_PATH = path.join(DATA_DIR, primary ? 'nss.db' : `account-${accountId}.db`);
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    _db = new Database(DB_PATH);
-    _db.pragma('journal_mode = WAL');
-    initSchema(_db);
-    return _db;
+    const db = new Database(DB_PATH);
+    db.pragma('journal_mode = WAL');
+    initSchema(db, primary);
+    if (primary) initPlatformSchema(db);
+    _dbs.set(accountId, db);
+    return db;
   } catch (e: any) {
-    _dbError = e.message;
+    // Only a failure to open the primary file is fatal for the whole process.
+    if (accountId === PRIMARY_ACCOUNT_ID) _dbError = e.message;
     throw e;
   }
 }
 
-function initSchema(db: any) {
+/** Users and customer accounts. Always the primary file. */
+export function getPlatformDb() {
+  return openAccountDb(PRIMARY_ACCOUNT_ID);
+}
+
+/**
+ * Which account this request is for.
+ *  - a customer's user      -> their own account, always
+ *  - ACE staff (no account) -> the account they picked (ams_account cookie)
+ *  - a scheduler            -> x-account-id, only with a valid x-cron-key
+ *  - nobody / no request    -> the primary account (routes still check the
+ *                              session themselves before returning anything)
+ */
+export function currentAccountId(): number {
+  try {
+    const { cookies, headers } = require('next/headers');
+    const { verifyToken, SESSION_COOKIES, ACCOUNT_COOKIE } = require('./auth');
+    const store = cookies();
+    const pdb = getPlatformDb();
+    const exists = (id: number) => Number.isInteger(id) && id > 0 && !!pdb.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
+
+    let session: any = null;
+    for (const name of SESSION_COOKIES) {
+      const raw = store.get(name)?.value;
+      session = raw ? verifyToken(raw) : null;
+      if (session) break;
+    }
+    if (!session) {
+      const cronKey = process.env.SEO_CRON_KEY;
+      const h = headers();
+      if (cronKey && h.get('x-cron-key') === cronKey) {
+        const asked = Number(h.get('x-account-id'));
+        if (exists(asked)) return asked;
+      }
+      return PRIMARY_ACCOUNT_ID;
+    }
+    const user = pdb.prepare('SELECT account_id FROM users WHERE id = ?').get(session.id) as any;
+    if (!user) return PRIMARY_ACCOUNT_ID;
+    if (user.account_id) return user.account_id;
+    const picked = Number(store.get(ACCOUNT_COOKIE)?.value);
+    return exists(picked) ? picked : PRIMARY_ACCOUNT_ID;
+  } catch {
+    return PRIMARY_ACCOUNT_ID;
+  }
+}
+
+/** The signed-in user's account database. */
+export function getDb() {
+  return openAccountDb(currentAccountId());
+}
+
+/**
+ * Platform tables: customer accounts, and which account each user belongs to.
+ * users.account_id NULL = ACE staff, who can open every account.
+ */
+function initPlatformSchema(db: any) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      domain TEXT NOT NULL DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+  const has = db.prepare('SELECT id FROM accounts WHERE id = ?').get(PRIMARY_ACCOUNT_ID);
+  if (!has) {
+    // The first customer. Everything already in this file is theirs.
+    db.prepare('INSERT INTO accounts (id, name, domain) VALUES (?,?,?)').run(
+      PRIMARY_ACCOUNT_ID,
+      process.env.PRIMARY_ACCOUNT_NAME || 'National Salon Supplies',
+      process.env.PRIMARY_ACCOUNT_DOMAIN || 'nationalsalonsupplies.com.au',
+    );
+  }
+  const cols = db.prepare(`PRAGMA table_info(users)`).all() as any[];
+  if (!cols.some(c => c.name === 'account_id')) {
+    db.exec(`ALTER TABLE users ADD COLUMN account_id INTEGER`);
+    // One-off: every user that existed before accounts did belongs to the first customer.
+    db.prepare('UPDATE users SET account_id = ?').run(PRIMARY_ACCOUNT_ID);
+  }
+  if (!cols.some(c => c.name === 'hub_user_id')) {
+    db.exec(`ALTER TABLE users ADD COLUMN hub_user_id TEXT`);
+  }
+}
+
+function initSchema(db: any, primary: boolean) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,7 +243,8 @@ function initSchema(db: any) {
   `);
   try {
     const count = (db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c;
-    if (count === 0) {
+    // Logins live in the primary file only; other account files never get a seeded user.
+    if (primary && count === 0) {
       const bcrypt = require('bcryptjs');
       const hash = bcrypt.hashSync('nss2024!', 10);
       db.prepare('INSERT INTO users (email, password_hash, role) VALUES (?,?,?)').run('admin@nss.com.au', hash, 'admin');
@@ -163,7 +268,7 @@ function initSchema(db: any) {
     const bvCount = (db.prepare('SELECT COUNT(*) as c FROM brand_voices').get() as any).c;
     if (bvCount === 0) {
       db.prepare('INSERT INTO brand_voices (name, voice_tone, style, is_default) VALUES (?,?,?,1)')
-        .run('NSS Default', 'Friendly, expert, helpful — speaks to salon professionals', 'Conversational with practical detail');
+        .run(primary ? 'NSS Default' : 'Default', primary ? 'Friendly, expert, helpful — speaks to salon professionals' : 'Friendly, expert, helpful', 'Conversational with practical detail');
     }
   } catch {}
   // uploaded_data (CSV uploads) table + migrations for older volumes

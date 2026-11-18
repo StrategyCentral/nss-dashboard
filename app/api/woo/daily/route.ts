@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { requireStore } from '@/lib/account';
 
-const WC_KEY = 'ck_f2fcbdab70d6d74bff230207b02e2369987b2edf';
-const WC_SECRET = 'cs_08088c7f6b33a10b089502ec28d203ed31b79c71';
-const WC_URL = 'https://nationalsalonsupplies.com.au';
 
 async function fetchPage(after: string, before: string, page: number): Promise<any[]> {
   const res = await fetch(
-    `${WC_URL}/wp-json/wc/v3/orders?after=${after}&before=${before}&status=completed,processing&per_page=100&page=${page}&consumer_key=${WC_KEY}&consumer_secret=${WC_SECRET}`,
+    `${requireStore().url}/wp-json/wc/v3/orders?after=${after}&before=${before}&status=completed,processing&per_page=100&page=${page}&consumer_key=${requireStore().key}&consumer_secret=${requireStore().secret}`,
     { next: { revalidate: 3600 } }
   );
   if (!res.ok) throw new Error(`WC ${res.status}`);

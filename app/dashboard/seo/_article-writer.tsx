@@ -191,7 +191,7 @@ function ArticlePreview({
             <div style={{ marginBottom: 12 }}>
               <div className="form-label">Site</div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button style={CHIP_STYLE(pubSite === 'beauty', '#E7258D')} onClick={() => setPubSite('beauty')}>NSS Beauty (/beauty/)</button>
+                <button style={CHIP_STYLE(pubSite === 'beauty', '#E7258D')} onClick={() => setPubSite('beauty')}>Blog</button>
                 <button style={CHIP_STYLE(pubSite === 'main', '#04AAE8')} onClick={() => setPubSite('main')}>Main Site</button>
               </div>
             </div>
@@ -215,9 +215,11 @@ function ArticlePreview({
 }
 
 // ── Generate Sub-tab ──────────────────────────────────────────────────────────
-function GenerateTab({ voices, onArticleReady }: { voices: BrandVoice[]; onArticleReady: (a: Article) => void }) {
+function GenerateTab({ voices, onArticleReady, initialKeyword }: { voices: BrandVoice[]; onArticleReady: (a: Article) => void; initialKeyword?: string }) {
   const [mode, setMode] = useState<'super_page' | 'rewrite'>('super_page');
-  const [keyword, setKeyword] = useState('');
+  const [keyword, setKeyword] = useState(initialKeyword || '');
+  // A keyword handed over from Keyword Research.
+  useEffect(() => { if (initialKeyword) { setMode('super_page'); setKeyword(initialKeyword); } }, [initialKeyword]);
   const [sourceText, setSourceText] = useState('');
   const [pageFormat, setPageFormat] = useState(PAGE_FORMATS[0].key);
   const [brandVoiceId, setBrandVoiceId] = useState<number | ''>('');
@@ -642,7 +644,7 @@ function BrandVoiceForm({ initial, isNew, onClose, onSaved }: { initial: BrandVo
 
         <div style={{ marginBottom: 12 }}>
           <label className="form-label">Name</label>
-          <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. NSS Friendly Pro" />
+          <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Friendly Pro" />
         </div>
         <div style={{ marginBottom: 12 }}>
           <label className="form-label">Voice Tone</label>
@@ -681,7 +683,7 @@ function BrandVoiceForm({ initial, isNew, onClose, onSaved }: { initial: BrandVo
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function ArticleWriterTab() {
+export default function ArticleWriterTab({ initialKeyword }: { initialKeyword?: string } = {}) {
   const [subTab, setSubTab] = useState<'generate' | 'docs' | 'voices'>('generate');
   const [voices, setVoices] = useState<BrandVoice[]>([]);
 
@@ -701,7 +703,7 @@ export default function ArticleWriterTab() {
         <button style={SUB_TAB_STYLE(subTab === 'voices', '#04AAE8')} onClick={() => setSubTab('voices')}>♪ Brand Voices</button>
       </div>
 
-      {subTab === 'generate' && <GenerateTab voices={voices} onArticleReady={() => {}} />}
+      {subTab === 'generate' && <GenerateTab voices={voices} onArticleReady={() => {}} initialKeyword={initialKeyword} />}
       {subTab === 'docs' && <DocsTab voices={voices} />}
       {subTab === 'voices' && <BrandVoicesTab voices={voices} reload={loadVoices} />}
     </div>

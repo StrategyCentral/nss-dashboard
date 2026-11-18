@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { siteUrl } from '@/lib/account';
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -9,13 +10,13 @@ export async function POST(req: NextRequest) {
   const { nodeId, url } = await req.json();
   if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
 
-  const fullUrl = url.startsWith('http') ? url : `https://nationalsalonsupplies.com.au${url}`;
+  const fullUrl = url.startsWith('http') ? url : `${siteUrl()}${url}`;
 
   try {
     // Fetch the page with a browser-like UA
     const pageRes = await fetch(fullUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; NSS-Dashboard-Crawler/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; ACE-Marketing-Suite-Crawler/1.0)',
         'Accept': 'text/html,application/xhtml+xml',
       },
       signal: AbortSignal.timeout(15000),

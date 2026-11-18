@@ -17,7 +17,7 @@ const AD_PLATFORMS = [
     setupSteps: [
       'Go to business.facebook.com → Settings → System Users',
       'Click the "james" system user (Admin access) → Generate token',
-      'Select the "NSS Analytics" app → click Next → Generate token',
+      'Select your analytics app → click Next → Generate token',
       'Copy the token and paste it below → click Save',
       'Get your Ad Account ID from Ads Manager (format: act_XXXXXXXXXX)',
     ],
@@ -71,8 +71,8 @@ const GOOGLE_SECTION = {
     { key: 'google_ads_customer_id', label: 'Google Ads Customer ID', hint: '123-456-7890', note: 'Found in Google Ads → top-right account selector' },
     { key: 'google_ads_manager_id', label: 'Manager (MCC) Account ID', hint: '507-193-1020', note: 'Your agency MCC account ID — leave blank if no manager account' },
     { key: 'ga4_property_id', label: 'GA4 Property ID', hint: '123456789', note: 'GA4 → Admin → Property Settings' },
-    { key: 'gsc_site_main', label: 'Search Console — Main Site', hint: 'https://nationalsalonsupplies.com.au/', note: 'Must match exactly as shown in GSC', prefill: 'https://nationalsalonsupplies.com.au/' },
-    { key: 'gsc_site_blog', label: 'Search Console — Blog', hint: 'https://nationalsalonsupplies.com.au/beauty/', note: 'Subfolder property in GSC', prefill: 'https://nationalsalonsupplies.com.au/beauty/' },
+    { key: 'gsc_site_main', label: 'Search Console — Main Site', hint: 'https://yoursite.com/', note: 'Must match exactly as shown in GSC' },
+    { key: 'gsc_site_blog', label: 'Search Console — Blog', hint: 'https://yoursite.com/blog/', note: 'Optional: a subfolder property in GSC' },
   ],
 };
 
@@ -82,9 +82,20 @@ const WOOCOMMERCE_SECTION = {
   border: 'rgba(150,88,138,0.25)',
   icon: <svg width="26" height="26" viewBox="0 0 24 24"><path fill="#96588A" d="M2.226 0h19.548A2.226 2.226 0 0124 2.226v10.365a2.226 2.226 0 01-2.226 2.226H13.2l1.168 2.85-4.48-2.85H2.226A2.226 2.226 0 010 12.591V2.226A2.226 2.226 0 012.226 0zm1.8 3.513a.735.735 0 00-.61.352.804.804 0 00-.086.673l2.497 8.37a.805.805 0 001.44.2l2.05-3.717 1.94 3.717a.805.805 0 001.44-.2l2.498-8.37a.804.804 0 00-.087-.673.735.735 0 00-.61-.352.776.776 0 00-.755.59L11.47 10.2 9.691 6.722a.776.776 0 00-.707-.482.776.776 0 00-.697.482L6.534 10.2 4.782 4.103a.776.776 0 00-.756-.59zm14.438.13c-.875 0-1.55.38-2.025 1.14-.41.65-.616 1.45-.616 2.4 0 .72.14 1.35.42 1.89.36.69.875 1.03 1.544 1.03.55 0 1.02-.23 1.41-.69v.52c0 .03.012.05.034.07.023.018.05.026.08.026h1.008a.11.11 0 00.114-.096l.6-4.943a.113.113 0 00-.025-.086.108.108 0 00-.08-.036h-1.02a.11.11 0 00-.11.096l-.046.39c-.34-.478-.79-.716-1.29-.716zm-.19 1.138c.26 0 .478.108.655.324.178.216.267.494.267.834 0 .424-.1.77-.3 1.04-.2.27-.44.404-.722.404-.27 0-.49-.12-.664-.36-.174-.24-.26-.554-.26-.94 0-.41.094-.742.282-.996.188-.253.43-.38.742-.306z"/></svg>,
   fields: [
-    { key: 'woocommerce_url', label: 'Store URL', hint: 'https://nationalsalonsupplies.com.au', note: 'Your WooCommerce store domain', secret: false },
+    { key: 'woocommerce_url', label: 'Store URL', hint: 'https://yourstore.com', note: 'Your WooCommerce store domain', secret: false },
     { key: 'woocommerce_key', label: 'Consumer Key', hint: 'ck_...', note: 'WooCommerce → Settings → Advanced → REST API', secret: true },
     { key: 'woocommerce_secret', label: 'Consumer Secret', hint: 'cs_...', note: 'Generated alongside the Consumer Key', secret: true },
+  ],
+};
+
+// Paid SEO data (keyword research, backlink profile, rank tracker). The site audit does not need it.
+const DATAFORSEO_SECTION = {
+  color: '#A8CF45',
+  bg: 'rgba(168,207,69,0.08)',
+  border: 'rgba(168,207,69,0.25)',
+  fields: [
+    { key: 'dataforseo_login', label: 'API Login', hint: 'abc123xyz…', note: 'DataForSEO → API Access → API login', secret: false },
+    { key: 'dataforseo_password', label: 'API Password', hint: '16 characters', note: 'The API password on the same page, not your dashboard password', secret: true },
   ],
 };
 
@@ -125,12 +136,11 @@ function ConnectionsPage() {
   useEffect(() => {
     loadOAuthStatus();
     loadSavedKeys();
-    // prefill GSC URLs
-    setCreds(c => ({
-      ...c,
-      gsc_site_main: c.gsc_site_main || 'https://nationalsalonsupplies.com.au/',
-      gsc_site_blog: c.gsc_site_blog || 'https://nationalsalonsupplies.com.au/beauty/',
-    }));
+    // Prefill the main Search Console property from the account's own website.
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => {
+      const domain = d?.account?.domain;
+      if (domain) setCreds(c => ({ ...c, gsc_site_main: c.gsc_site_main || `https://${domain}/` }));
+    });
   }, []);
 
   async function loadOAuthStatus() {
@@ -243,6 +253,7 @@ function ConnectionsPage() {
   // Count configured fields per section
   const googleConfigured = GOOGLE_SECTION.properties.filter(p => savedKeys[p.key]).length;
   const wooConfigured = WOOCOMMERCE_SECTION.fields.filter(f => savedKeys[f.key]).length;
+  const seoDataConfigured = DATAFORSEO_SECTION.fields.filter(f => savedKeys[f.key]).length;
 
   return (
     <div>
@@ -496,6 +507,58 @@ function ConnectionsPage() {
                 <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12, marginBottom: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Credentials</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {WOOCOMMERCE_SECTION.fields.map(f => (
+                    <FieldRow key={f.key} fkey={f.key} label={f.label} hint={f.hint} note={f.note} secret={f.secret} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── DATAFORSEO ── */}
+      <div style={{ marginBottom: 8, fontSize: 11, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: '0.1em', color: 'var(--muted)', textTransform: 'uppercase', padding: '0 2px' }}>SEO Data</div>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 24px' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 10, background: DATAFORSEO_SECTION.bg, border: `1px solid ${DATAFORSEO_SECTION.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: DATAFORSEO_SECTION.color, fontSize: 20 }}>
+            ◎
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 800, fontSize: 15 }}>DataForSEO</span>
+              {seoDataConfigured === DATAFORSEO_SECTION.fields.length ? <ConnectedBadge /> : <NotConnectedBadge />}
+              <ConfiguredPill count={seoDataConfigured} total={DATAFORSEO_SECTION.fields.length} />
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Keyword research, backlink profile and rank tracking. Billed per lookup; the site audit is free and does not need it.</div>
+          </div>
+          <button onClick={() => setExpanded(e => ({ ...e, dataforseo: !e.dataforseo }))} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', flexShrink: 0 }}>
+            {expanded.dataforseo ? '✕ Done' : seoDataConfigured > 0 ? '✎ Edit' : '⚙ Set Up'}
+          </button>
+        </div>
+
+        {expanded.dataforseo && (
+          <div style={{ borderTop: '1px solid var(--border)', padding: '20px 24px', background: 'rgba(255,255,255,0.02)' }}>
+            <div className="grid-2" style={{ gap: 24 }}>
+              <div>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12, marginBottom: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>How to get the API login</div>
+                <ol style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {[
+                    'Sign in at app.dataforseo.com (pay-as-you-go, US$50 minimum top-up)',
+                    'Open API Access in the left menu',
+                    'Copy the API login and the API password',
+                    'Typical cost: about US$0.02 a keyword lookup, US$0.10 a backlink profile, US$0.01 a rank check',
+                  ].map((step, i) => (
+                    <li key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12 }}>
+                      <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(168,207,69,0.15)', color: '#A8CF45', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
+                      <span style={{ color: 'var(--muted)', lineHeight: 1.5 }}>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12, marginBottom: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Credentials</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {DATAFORSEO_SECTION.fields.map(f => (
                     <FieldRow key={f.key} fkey={f.key} label={f.label} hint={f.hint} note={f.note} secret={f.secret} />
                   ))}
                 </div>

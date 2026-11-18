@@ -25,7 +25,7 @@
         "./*"
       ]
     },
-    "target": "ES2017",
+    "target": "es2020",
     "incremental": true
   },
   "include": [

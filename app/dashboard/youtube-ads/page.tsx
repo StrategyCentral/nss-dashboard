@@ -84,12 +84,12 @@ const CHECKLIST_SECTIONS = [
     ],
   },
   {
-    title: 'NSS-Specific Actions', icon: '💅', color: '#ff1e8e',
+    title: 'Your Next Actions', icon: '💅', color: '#ff1e8e',
     items: [
       { id: 'n1', text: 'Create beauty professional targeted ad group (salon owners, hairdressers, beauty therapists)' },
       { id: 'n2', text: 'Build product demonstration videos for hero SKUs (shampoos, colour, styling)' },
       { id: 'n3', text: 'Run 6-second bumper ads as retargeting for website visitors who did not purchase' },
-      { id: 'n4', text: 'Add UTM params to all NSS YouTube ads matching the attribution dashboard format' },
+      { id: 'n4', text: 'Add UTM params to all your YouTube ads matching the attribution dashboard format' },
       { id: 'n5', text: 'Target competitor brand keywords as placements (e.g. Wella, Schwarzkopf tutorials)' },
       { id: 'n6', text: 'Upload customer email list to Customer Match for loyalty and upsell campaigns' },
     ],

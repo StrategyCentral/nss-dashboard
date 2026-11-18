@@ -126,8 +126,8 @@ function MetaManualTab() {
             {F('date_to', 'Date To', 'date')}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
-            {F('campaign_name', 'Campaign Name *', 'text', 'NSS Ongoing Advantage+')}
-            {F('adset_name', 'Adset Name', 'text', 'NSS Advantage+ Ongoing')}
+            {F('campaign_name', 'Campaign Name *', 'text', 'Ongoing Advantage+')}
+            {F('adset_name', 'Adset Name', 'text', 'Advantage+ Ongoing')}
             {F('ad_name', 'Ad Name', 'text', 'IMAGE AD 1')}
           </div>
 

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-export const metadata: Metadata = { title: 'NSS Marketing Dashboard', description: 'National Salon Supplies — Marketing Intelligence' };
+export const metadata: Metadata = { title: 'ACE Marketing Suite', description: 'Ads, SEO and revenue in one place.' };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return <html lang="en"><body>{children}</body></html>;
 }

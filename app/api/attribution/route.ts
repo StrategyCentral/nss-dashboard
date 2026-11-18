@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { requireStore } from '@/lib/account';
 import { getDb } from '@/lib/db';
 
-const WC_KEY = 'ck_f2fcbdab70d6d74bff230207b02e2369987b2edf';
-const WC_SECRET = 'cs_08088c7f6b33a10b089502ec28d203ed31b79c71';
-const WC_URL = 'https://nationalsalonsupplies.com.au';
 
 function initTables(db: any) {
   db.exec(`
@@ -61,7 +59,7 @@ export async function GET(req: NextRequest) {
     const pages = [1, 2, 3, 4, 5];
     let allOrders: any[] = [];
     for (const page of pages) {
-      const res = await fetch(`${WC_URL}/wp-json/wc/v3/orders?consumer_key=${WC_KEY}&consumer_secret=${WC_SECRET}&per_page=100&page=${page}&status=completed,processing`, { signal: AbortSignal.timeout(20000) });
+      const res = await fetch(`${requireStore().url}/wp-json/wc/v3/orders?consumer_key=${requireStore().key}&consumer_secret=${requireStore().secret}&per_page=100&page=${page}&status=completed,processing`, { signal: AbortSignal.timeout(20000) });
       if (!res.ok) break;
       const batch = await res.json();
       if (!batch.length) break;
@@ -171,7 +169,7 @@ export async function POST(req: NextRequest) {
       ON CONFLICT(order_id) DO UPDATE SET utm_campaign=excluded.utm_campaign, override_reason=excluded.override_reason, updated_at=datetime('now')`);
 
     for (const page of pages) {
-      const res = await fetch(`${WC_URL}/wp-json/wc/v3/orders?consumer_key=${WC_KEY}&consumer_secret=${WC_SECRET}&per_page=100&page=${page}&status=completed,processing`, { signal: AbortSignal.timeout(15000) });
+      const res = await fetch(`${requireStore().url}/wp-json/wc/v3/orders?consumer_key=${requireStore().key}&consumer_secret=${requireStore().secret}&per_page=100&page=${page}&status=completed,processing`, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) break;
       const orders = await res.json();
       if (!orders.length) break;

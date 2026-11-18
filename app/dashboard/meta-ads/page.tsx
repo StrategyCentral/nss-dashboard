@@ -4,18 +4,18 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, C
 import { useRouter } from 'next/navigation';
 
 const FB_DEMO_CAMPAIGNS = [
-  { name: 'NSS Ongoing Advantage+ Shopping', spend: 2840, revenue: 13200, roas: 4.65, conversions: 108, clicks: 2290, impressions: 48400, cpc: 1.24, cpa: 26.3, ctr: 4.73,
+  { name: 'Ongoing Advantage+ Shopping', spend: 2840, revenue: 13200, roas: 4.65, conversions: 108, clicks: 2290, impressions: 48400, cpc: 1.24, cpa: 26.3, ctr: 4.73,
     adsets: [
-      { name: 'NSS Advantage+ Ongoing', campaign: 'NSS Ongoing Advantage+ Shopping', spend: 1820, revenue: 8640, roas: 4.75, conversions: 71, clicks: 1480, impressions: 31200, cpc: 1.23, cpa: 25.6, ctr: 4.74,
+      { name: 'Advantage+ Ongoing', campaign: 'Ongoing Advantage+ Shopping', spend: 1820, revenue: 8640, roas: 4.75, conversions: 71, clicks: 1480, impressions: 31200, cpc: 1.23, cpa: 25.6, ctr: 4.74,
         ads: [
           { name: 'IMAGE AD 1', spend: 680, revenue: 3240, roas: 4.76, conversions: 27, clicks: 550, impressions: 11600, cpc: 1.24, cpa: 25.2, reach: 8200, frequency: 1.41 },
           { name: 'IMAGE Ad 2', spend: 590, revenue: 2820, roas: 4.78, conversions: 23, clicks: 480, impressions: 10100, cpc: 1.23, cpa: 25.7, reach: 7400, frequency: 1.36 },
           { name: 'Productfeed Ad', spend: 550, revenue: 2580, roas: 4.69, conversions: 21, clicks: 450, impressions: 9500, cpc: 1.22, cpa: 26.2, reach: 7100, frequency: 1.34 },
         ]},
     ]},
-  { name: 'NSS Cold Audience Beauty Professionals', spend: 1980, revenue: 8280, roas: 4.18, conversions: 76, clicks: 1620, impressions: 36200, cpc: 1.22, cpa: 26.1, ctr: 4.48,
+  { name: 'Cold Audience Beauty Professionals', spend: 1980, revenue: 8280, roas: 4.18, conversions: 76, clicks: 1620, impressions: 36200, cpc: 1.22, cpa: 26.1, ctr: 4.48,
     adsets: [
-      { name: 'Beauty Pros Lookalike 1%', campaign: 'NSS Cold Audience Beauty Professionals', spend: 1100, revenue: 4680, roas: 4.25, conversions: 43, clicks: 900, impressions: 20100, cpc: 1.22, cpa: 25.6, ctr: 4.48,
+      { name: 'Beauty Pros Lookalike 1%', campaign: 'Cold Audience Beauty Professionals', spend: 1100, revenue: 4680, roas: 4.25, conversions: 43, clicks: 900, impressions: 20100, cpc: 1.22, cpa: 25.6, ctr: 4.48,
         ads: [{ name: 'IMAGE Ad 3', spend: 1100, revenue: 4680, roas: 4.25, conversions: 43, clicks: 900, impressions: 20100, cpc: 1.22, cpa: 25.6, reach: 14800, frequency: 1.36 }]},
     ]},
 ];
@@ -348,7 +348,7 @@ function LifetimePerformance({ data }: { data: any }) {
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-          📅 All Time Performance — NSS ONGOING - Bully
+          📅 All Time Performance
         </div>
         <div style={{ fontSize: 11, color: 'var(--muted)' }}>
           {data.reportingStart} → {data.reportingEnd} · {data.ads.length} ads · Lifetime totals

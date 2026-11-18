@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { requireStore } from '@/lib/account';
 import { getDb } from '@/lib/db';
 
-const WC_KEY = 'ck_f2fcbdab70d6d74bff230207b02e2369987b2edf';
-const WC_SECRET = 'cs_08088c7f6b33a10b089502ec28d203ed31b79c71';
-const WC_URL = 'https://nationalsalonsupplies.com.au';
 const DEFAULT_MARGIN = 40; // 40% profit margin on regular price
 
 function initMarginsTable(db: any) {
@@ -35,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // Fetch from WooCommerce
-    let wcUrl = `${WC_URL}/wp-json/wc/v3/products?consumer_key=${WC_KEY}&consumer_secret=${WC_SECRET}&per_page=${perPage}&page=${page}&status=publish`;
+    let wcUrl = `${requireStore().url}/wp-json/wc/v3/products?consumer_key=${requireStore().key}&consumer_secret=${requireStore().secret}&per_page=${perPage}&page=${page}&status=publish`;
     if (category) wcUrl += `&category=${category}`;
     if (search) wcUrl += `&search=${encodeURIComponent(search)}`;
 
