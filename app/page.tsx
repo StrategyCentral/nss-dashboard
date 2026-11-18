@@ -32,8 +32,8 @@ export default function LoginPage() {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
             <div>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, letterSpacing:'0.05em', color:'var(--text)' }}>NATIONAL SALON</div>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, fontWeight:600, letterSpacing:'0.12em', color:'var(--muted)', marginTop:-2 }}>MARKETING INTELLIGENCE</div>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, letterSpacing:'0.05em', color:'var(--text)' }}>ACE MARKETING SUITE</div>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, fontWeight:600, letterSpacing:'0.12em', color:'var(--muted)', marginTop:-2 }}>ADS · SEO · REVENUE</div>
             </div>
           </div>
           <div style={{ width:60, height:3, background:'linear-gradient(90deg, var(--pink), var(--blue))', borderRadius:2, margin:'0 auto' }}/>
@@ -60,7 +60,7 @@ export default function LoginPage() {
           </form>
 
           <p style={{ fontSize:11, color:'var(--muted)', marginTop:20, textAlign:'center' }}>
-            Default: admin@nss.com.au / nss2024!
+            ACE team? <a href="/sso/consume" style={{ color:'var(--pink)' }}>Sign in with the ACE Hub</a>
           </p>
         </div>
 

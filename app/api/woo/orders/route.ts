@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { requireStore, siteUrl, cleanDomain } from '@/lib/account';
 import { getDb } from '@/lib/db';
 
-const WC_KEY = 'ck_f2fcbdab70d6d74bff230207b02e2369987b2edf';
-const WC_SECRET = 'cs_08088c7f6b33a10b089502ec28d203ed31b79c71';
-const WC_URL = 'https://nationalsalonsupplies.com.au';
 const DEFAULT_MARGIN = 40;
 
 function getMeta(order: any, key: string) {
   return order.meta_data?.find((m: any) => m.key === key)?.value || '';
 }
 
-function mapChannel(source: string, medium: string, campaign: string, referrer: string) {
+function mapChannel(source: string, medium: string, campaign: string, referrer: string, ownHost = '') {
   const s = source.toLowerCase();
   const m = medium.toLowerCase();
   const c = campaign.toLowerCase();
@@ -27,7 +25,7 @@ function mapChannel(source: string, medium: string, campaign: string, referrer: 
   if (m === 'organic' || s === 'google' || r.includes('google.com')) return { channel: 'SEO / Organic', color: '#a8cf45', icon: '🔍' };
   if (m === 'email' || s.includes('email') || s.includes('klaviyo')) return { channel: 'Email', color: '#ffe600', icon: '✉' };
   if (m === 'social' || s.includes('facebook') || s.includes('instagram')) return { channel: 'Social (Organic)', color: '#c084fc', icon: '📱' };
-  if (m === 'referral' || (r && !r.includes('nationalsalonsupplies'))) return { channel: 'Referral', color: '#22d3ee', icon: '🔗' };
+  if (m === 'referral' || (r && !(ownHost && r.includes(ownHost)))) return { channel: 'Referral', color: '#22d3ee', icon: '🔗' };
   if (!source && !medium) return { channel: 'Direct', color: '#888', icon: '🌐' };
   return { channel: 'Other', color: '#888', icon: '🌐' };
 }
@@ -37,6 +35,8 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const url = new URL(req.url);
+  // A visit referred from the customer's own site is not a referral.
+  const ownHost = cleanDomain(siteUrl()).split('.')[0];
   const period = url.searchParams.get('period') || 'this_month';
   const perPage = 100;
 
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
   try {
     // Fetch orders from WooCommerce
     const ordersRes = await fetch(
-      `${WC_URL}/wp-json/wc/v3/orders?consumer_key=${WC_KEY}&consumer_secret=${WC_SECRET}&per_page=${perPage}&after=${after}&before=${before}&status=completed,processing`,
+      `${requireStore().url}/wp-json/wc/v3/orders?consumer_key=${requireStore().key}&consumer_secret=${requireStore().secret}&per_page=${perPage}&after=${after}&before=${before}&status=completed,processing`,
       { signal: AbortSignal.timeout(20000) }
     );
     if (!ordersRes.ok) throw new Error(`WC ${ordersRes.status}`);
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
 
       const { channel, color, icon } = override?.channel
         ? { channel: override.channel, color: override.channel.includes('Google') ? '#4285F4' : override.channel.includes('Instagram') ? '#E1306C' : override.channel.includes('Facebook') ? '#1877F2' : '#888', icon: override.channel.includes('Google') ? '📢' : override.channel.includes('Instagram') ? '📸' : '🌐' }
-        : mapChannel(source, medium, campaign, referrer);
+        : mapChannel(source, medium, campaign, referrer, ownHost);
 
       const orderTotal = parseFloat(order.total || '0');
 

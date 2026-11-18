@@ -1,22 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getDb } from '@/lib/db';
+import { getDb, currentAccountId, PRIMARY_ACCOUNT_ID } from '@/lib/db';
+import { siteUrl } from '@/lib/account';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
+// Where articles are published. The first customer's two WordPress sites are
+// set by env (WP_MAIN_*, WP_BEAUTY_*). Every other account reads its own from
+// its Connections (wp_<site>_url / _user / _app_password), so one customer's
+// article can never be posted to another customer's site.
 function siteCreds(site: 'main' | 'beauty') {
+  const primary = currentAccountId() === PRIMARY_ACCOUNT_ID;
+  const key = (service: string) =>
+    (getDb().prepare('SELECT key_value FROM api_keys WHERE service = ?').get(service) as any)?.key_value || '';
+  const env = (name: string) => (primary ? process.env[name] || '' : '');
+  const base = siteUrl();
   if (site === 'main') {
     return {
-      url: (process.env.WP_MAIN_URL || 'https://nationalsalonsupplies.com.au').replace(/\/$/, ''),
-      user: process.env.WP_MAIN_USER || '',
-      pass: process.env.WP_MAIN_APP_PASSWORD || '',
+      url: (key('wp_main_url') || env('WP_MAIN_URL') || base).replace(/\/$/, ''),
+      user: key('wp_main_user') || env('WP_MAIN_USER'),
+      pass: key('wp_main_app_password') || env('WP_MAIN_APP_PASSWORD'),
     };
   }
   return {
-    url: (process.env.WP_BEAUTY_URL || 'https://nationalsalonsupplies.com.au/beauty').replace(/\/$/, ''),
-    user: process.env.WP_BEAUTY_USER || '',
-    pass: process.env.WP_BEAUTY_APP_PASSWORD || '',
+    url: (key('wp_beauty_url') || env('WP_BEAUTY_URL') || (primary && base ? `${base}/beauty` : '')).replace(/\/$/, ''),
+    user: key('wp_beauty_user') || env('WP_BEAUTY_USER'),
+    pass: key('wp_beauty_app_password') || env('WP_BEAUTY_APP_PASSWORD'),
   };
 }
 

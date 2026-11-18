@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
+  const [accountName, setAccountName] = useState('');
   const [form, setForm] = useState({ email: '', password: '', role: 'viewer' });
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -11,8 +13,12 @@ export default function UsersPage() {
     const r = await fetch('/api/admin/users');
     const d = await r.json();
     setUsers(d.users || []);
+    setStaff(d.staff || []);
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => setAccountName(d?.account?.name || ''));
+  }, []);
 
   async function addUser(e: React.FormEvent) {
     e.preventDefault();
@@ -32,12 +38,12 @@ export default function UsersPage() {
     <div>
       <div style={{ marginBottom: 28 }}>
         <h1 className="section-title" style={{ fontSize: 26 }}>Users</h1>
-        <p className="section-sub">Manage who can access the dashboard</p>
+        <p className="section-sub">Who can sign in to {accountName || 'this account'}. Admins can change settings and spend on paid lookups; viewers can only read.</p>
       </div>
 
       {/* Current users */}
       <div className="card" style={{ marginBottom: 20 }}>
-        <div style={{ marginBottom: 16 }}><div className="section-title" style={{ fontSize: 15 }}>Current Users</div></div>
+        <div style={{ marginBottom: 16 }}><div className="section-title" style={{ fontSize: 15 }}>{accountName ? `${accountName} users` : 'Current Users'}</div></div>
         <table className="data-table">
           <thead><tr><th>Email</th><th>Role</th><th>Created</th><th></th></tr></thead>
           <tbody>
@@ -56,6 +62,25 @@ export default function UsersPage() {
           </tbody>
         </table>
       </div>
+
+      {staff.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 4 }}><div className="section-title" style={{ fontSize: 15 }}>ACE staff</div></div>
+          <p className="section-sub" style={{ marginBottom: 12 }}>Sign in through the ACE Hub and can open every customer account.</p>
+          <table className="data-table">
+            <thead><tr><th>Email</th><th>Role</th><th>Created</th></tr></thead>
+            <tbody>
+              {staff.map(u => (
+                <tr key={u.id}>
+                  <td style={{ fontWeight: 500 }}>{u.email}</td>
+                  <td>{u.role}</td>
+                  <td style={{ color: 'var(--muted)', fontSize: 12 }}>{u.created_at?.slice(0, 10)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Add user */}
       <div className="card">

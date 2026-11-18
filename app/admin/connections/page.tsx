@@ -17,7 +17,7 @@ const AD_PLATFORMS = [
     setupSteps: [
       'Go to business.facebook.com → Settings → System Users',
       'Click the "james" system user (Admin access) → Generate token',
-      'Select the "NSS Analytics" app → click Next → Generate token',
+      'Select your analytics app → click Next → Generate token',
       'Copy the token and paste it below → click Save',
       'Get your Ad Account ID from Ads Manager (format: act_XXXXXXXXXX)',
     ],
@@ -71,8 +71,8 @@ const GOOGLE_SECTION = {
     { key: 'google_ads_customer_id', label: 'Google Ads Customer ID', hint: '123-456-7890', note: 'Found in Google Ads → top-right account selector' },
     { key: 'google_ads_manager_id', label: 'Manager (MCC) Account ID', hint: '507-193-1020', note: 'Your agency MCC account ID — leave blank if no manager account' },
     { key: 'ga4_property_id', label: 'GA4 Property ID', hint: '123456789', note: 'GA4 → Admin → Property Settings' },
-    { key: 'gsc_site_main', label: 'Search Console — Main Site', hint: 'https://nationalsalonsupplies.com.au/', note: 'Must match exactly as shown in GSC', prefill: 'https://nationalsalonsupplies.com.au/' },
-    { key: 'gsc_site_blog', label: 'Search Console — Blog', hint: 'https://nationalsalonsupplies.com.au/beauty/', note: 'Subfolder property in GSC', prefill: 'https://nationalsalonsupplies.com.au/beauty/' },
+    { key: 'gsc_site_main', label: 'Search Console — Main Site', hint: 'https://yoursite.com/', note: 'Must match exactly as shown in GSC' },
+    { key: 'gsc_site_blog', label: 'Search Console — Blog', hint: 'https://yoursite.com/blog/', note: 'Optional: a subfolder property in GSC' },
   ],
 };
 
@@ -82,7 +82,7 @@ const WOOCOMMERCE_SECTION = {
   border: 'rgba(150,88,138,0.25)',
   icon: <svg width="26" height="26" viewBox="0 0 24 24"><path fill="#96588A" d="M2.226 0h19.548A2.226 2.226 0 0124 2.226v10.365a2.226 2.226 0 01-2.226 2.226H13.2l1.168 2.85-4.48-2.85H2.226A2.226 2.226 0 010 12.591V2.226A2.226 2.226 0 012.226 0zm1.8 3.513a.735.735 0 00-.61.352.804.804 0 00-.086.673l2.497 8.37a.805.805 0 001.44.2l2.05-3.717 1.94 3.717a.805.805 0 001.44-.2l2.498-8.37a.804.804 0 00-.087-.673.735.735 0 00-.61-.352.776.776 0 00-.755.59L11.47 10.2 9.691 6.722a.776.776 0 00-.707-.482.776.776 0 00-.697.482L6.534 10.2 4.782 4.103a.776.776 0 00-.756-.59zm14.438.13c-.875 0-1.55.38-2.025 1.14-.41.65-.616 1.45-.616 2.4 0 .72.14 1.35.42 1.89.36.69.875 1.03 1.544 1.03.55 0 1.02-.23 1.41-.69v.52c0 .03.012.05.034.07.023.018.05.026.08.026h1.008a.11.11 0 00.114-.096l.6-4.943a.113.113 0 00-.025-.086.108.108 0 00-.08-.036h-1.02a.11.11 0 00-.11.096l-.046.39c-.34-.478-.79-.716-1.29-.716zm-.19 1.138c.26 0 .478.108.655.324.178.216.267.494.267.834 0 .424-.1.77-.3 1.04-.2.27-.44.404-.722.404-.27 0-.49-.12-.664-.36-.174-.24-.26-.554-.26-.94 0-.41.094-.742.282-.996.188-.253.43-.38.742-.306z"/></svg>,
   fields: [
-    { key: 'woocommerce_url', label: 'Store URL', hint: 'https://nationalsalonsupplies.com.au', note: 'Your WooCommerce store domain', secret: false },
+    { key: 'woocommerce_url', label: 'Store URL', hint: 'https://yourstore.com', note: 'Your WooCommerce store domain', secret: false },
     { key: 'woocommerce_key', label: 'Consumer Key', hint: 'ck_...', note: 'WooCommerce → Settings → Advanced → REST API', secret: true },
     { key: 'woocommerce_secret', label: 'Consumer Secret', hint: 'cs_...', note: 'Generated alongside the Consumer Key', secret: true },
   ],
@@ -136,12 +136,11 @@ function ConnectionsPage() {
   useEffect(() => {
     loadOAuthStatus();
     loadSavedKeys();
-    // prefill GSC URLs
-    setCreds(c => ({
-      ...c,
-      gsc_site_main: c.gsc_site_main || 'https://nationalsalonsupplies.com.au/',
-      gsc_site_blog: c.gsc_site_blog || 'https://nationalsalonsupplies.com.au/beauty/',
-    }));
+    // Prefill the main Search Console property from the account's own website.
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => {
+      const domain = d?.account?.domain;
+      if (domain) setCreds(c => ({ ...c, gsc_site_main: c.gsc_site_main || `https://${domain}/` }));
+    });
   }, []);
 
   async function loadOAuthStatus() {

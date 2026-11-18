@@ -1113,8 +1113,8 @@ function LinkMonitorTab() {
               <input value={form.source_url} onChange={e => setForm({ ...form, source_url: e.target.value })} placeholder="https://example.com/page" style={inputStyle} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Target URL (NSS page being linked to) *</label>
-              <input value={form.target_url} onChange={e => setForm({ ...form, target_url: e.target.value })} placeholder="https://nationalsalonsupplies.com.au/..." style={inputStyle} />
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Target URL (your page being linked to) *</label>
+              <input value={form.target_url} onChange={e => setForm({ ...form, target_url: e.target.value })} placeholder="https://yoursite.com/..." style={inputStyle} />
             </div>
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Anchor Text</label>
@@ -1146,7 +1146,7 @@ function LinkMonitorTab() {
             Paste CSV with columns: <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 3 }}>source_url,target_url,anchor_text,keyword,notes</code> (header row required)
           </div>
           <textarea value={bulkCsv} onChange={e => { setBulkCsv(e.target.value); setBulkParsed([]); }} rows={6}
-            placeholder={"source_url,target_url,anchor_text,keyword\nhttps://example.com/page,https://nationalsalonsupplies.com.au/wax,buy wax strips,wax strips"}
+            placeholder={"source_url,target_url,anchor_text,keyword\nhttps://example.com/page,https://yoursite.com/wax,buy wax strips,wax strips"}
             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.5, marginBottom: 10 }} />
           {bulkParsed.length > 0 && (
             <div style={{ fontSize: 12, color: '#a8cf45', marginBottom: 10 }}>
@@ -1266,6 +1266,8 @@ export default function SeoPage() {
   const [saving, setSaving] = useState(false);
   const [source, setSource] = useState('demo');
   const [mainTab, setMainTab] = useState<'rankings'|'structure'|'links'|'articles'|'audit'|'research'|'backlinks'|'tracker'>('rankings');
+  // Keyword handed from Keyword Research to the Article Writer.
+  const [writeKeyword, setWriteKeyword] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
@@ -1373,14 +1375,15 @@ export default function SeoPage() {
 
       {/* Top-level tab nav */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+        {/* Ordered the way the work flows: where you rank → what to target → write it → fix the site → links. */}
         <button style={TAB_STYLE(mainTab === 'rankings', '#a8cf45')} onClick={() => setMainTab('rankings')}>◎ Rankings</button>
         <button style={TAB_STYLE(mainTab === 'tracker', '#a8cf45')} onClick={() => setMainTab('tracker')}>↕ Rank Tracker</button>
-        <button style={TAB_STYLE(mainTab === 'audit', '#04aae8')} onClick={() => setMainTab('audit')}>✓ Site Audit</button>
         <button style={TAB_STYLE(mainTab === 'research', '#ffe600')} onClick={() => setMainTab('research')}>⌕ Keyword Research</button>
-        <button style={TAB_STYLE(mainTab === 'backlinks', '#ff1e8e')} onClick={() => setMainTab('backlinks')}>⇄ Backlink Profile</button>
-        <button style={TAB_STYLE(mainTab === 'structure', '#04aae8')} onClick={() => setMainTab('structure')}>⊞ Site Structure</button>
-        <button style={TAB_STYLE(mainTab === 'links', '#ff1e8e')} onClick={() => setMainTab('links')}>🔗 Link Monitor</button>
         <button style={TAB_STYLE(mainTab === 'articles', '#ffe600')} onClick={() => setMainTab('articles')}>✎ Article Writer</button>
+        <button style={TAB_STYLE(mainTab === 'audit', '#04aae8')} onClick={() => setMainTab('audit')}>✓ Site Audit</button>
+        <button style={TAB_STYLE(mainTab === 'structure', '#04aae8')} onClick={() => setMainTab('structure')}>⊞ Site Structure</button>
+        <button style={TAB_STYLE(mainTab === 'backlinks', '#ff1e8e')} onClick={() => setMainTab('backlinks')}>⇄ Backlink Profile</button>
+        <button style={TAB_STYLE(mainTab === 'links', '#ff1e8e')} onClick={() => setMainTab('links')}>🔗 Link Monitor</button>
       </div>
 
       {/* Rankings Tab */}
@@ -1585,13 +1588,13 @@ export default function SeoPage() {
       {mainTab === 'links' && <LinkMonitorTab />}
 
       {/* Article Writer Tab */}
-      {mainTab === 'articles' && <ArticleWriterTab />}
+      {mainTab === 'articles' && <ArticleWriterTab initialKeyword={writeKeyword} />}
 
       {/* ACE SEO tools. Kept mounted once opened would be nicer, but each loads its own saved data on open. */}
       {mainTab === 'tracker' && <RankTrackerTab />}
       {mainTab === 'audit' && <SiteAuditTab isAdmin={isAdmin} />}
-      {mainTab === 'research' && <KeywordResearchTab />}
-      {mainTab === 'backlinks' && <BacklinkProfileTab />}
+      {mainTab === 'research' && <KeywordResearchTab onWrite={(keyword) => { setWriteKeyword(keyword); setMainTab('articles'); }} />}
+      {mainTab === 'backlinks' && <BacklinkProfileTab onWatched={() => setMainTab('links')} />}
 
     </div>
   );

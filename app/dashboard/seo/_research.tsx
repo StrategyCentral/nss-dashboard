@@ -155,7 +155,7 @@ const MODES: Array<{ kind: LookupKind; label: string; field: string; placeholder
   { kind: 'competitors', label: 'Competitors', field: 'Domain', placeholder: 'example.com', help: 'Sites that rank for the same searches as this one.' },
 ];
 
-export function KeywordResearchTab() {
+export function KeywordResearchTab({ onWrite }: { onWrite?: (keyword: string) => void } = {}) {
   const research = useResearch(KEYWORD_KINDS);
   const { status, answer, loading, error } = research;
   const [kind, setKind] = useState<LookupKind>('keyword-ideas');
@@ -288,6 +288,7 @@ export function KeywordResearchTab() {
                       {canRun ? <th style={{ width: 30 }}><span style={{ position: 'absolute', left: -9999 }}>Select</span></th> : null}
                       <th>Keyword</th><th>Monthly searches</th><th>Difficulty</th><th>CPC (USD)</th><th>Intent</th>
                       {shownKind === 'domain-keywords' ? <><th>Position</th><th>Page</th></> : null}
+                      {canRun && onWrite ? <th><span style={{ position: 'absolute', left: -9999 }}>Write</span></th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -304,6 +305,11 @@ export function KeywordResearchTab() {
                             <td style={{ color: 'var(--blue)', fontWeight: 700 }}>{row.position ?? '—'}</td>
                             <td style={{ color: 'var(--muted)', maxWidth: 240, wordBreak: 'break-all' }}>{row.url ? row.url.replace(/^https?:\/\/[^/]+/, '') || '/' : '—'}</td>
                           </>
+                        ) : null}
+                        {canRun && onWrite ? (
+                          <td style={{ textAlign: 'right' }}>
+                            <button type="button" className="btn btn-ghost" style={SMALL_BTN} onClick={() => onWrite(row.keyword)} title="Open the Article Writer with this keyword">Write article</button>
+                          </td>
                         ) : null}
                       </tr>
                     ))}
@@ -340,11 +346,39 @@ function spamColor(value: number | null): string {
   return value < 20 ? 'var(--green)' : value < 50 ? 'var(--yellow)' : '#ff6b6b';
 }
 
-export function BacklinkProfileTab() {
+export function BacklinkProfileTab({ onWatched }: { onWatched?: () => void } = {}) {
   const research = useResearch(BACKLINK_KINDS);
   const { status, answer, loading, error } = research;
   const [domain, setDomain] = useState('');
   const [view, setView] = useState<'domains' | 'links' | 'anchors'>('domains');
+  const [watchNote, setWatchNote] = useState<string | null>(null);
+  const [watching, setWatching] = useState(false);
+
+  // Copy the links found here into the Link Monitor, which re-checks them over time.
+  // Links already being watched are skipped, so pressing it twice adds nothing.
+  async function watchLinks() {
+    const found = answer?.lookup.kind === 'backlinks' ? answer.result?.backlinks ?? [] : [];
+    if (!found.length || watching) return;
+    setWatching(true); setWatchNote(null);
+    try {
+      const existing = await fetch('/api/seo/links').then((r) => r.json()).catch(() => ({ links: [] }));
+      const have = new Set((existing.links || []).map((l: any) => `${l.source_url}|${l.target_url}`));
+      const links = found
+        .filter((row: any) => !have.has(`${row.fromUrl}|${row.toUrl}`))
+        .map((row: any) => ({ source_url: row.fromUrl, target_url: row.toUrl, anchor_text: row.anchor || '', notes: 'From Backlink Profile' }));
+      if (links.length) {
+        const response = await fetch('/api/seo/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ links }) });
+        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Could not add them.');
+      }
+      setWatchNote(links.length
+        ? `Added ${links.length} to the Link Monitor${found.length - links.length ? ` (${found.length - links.length} were already there)` : ''}.`
+        : 'All of these are already in the Link Monitor.');
+    } catch (problem: any) {
+      setWatchNote(problem?.message || 'Could not add them.');
+    } finally {
+      setWatching(false);
+    }
+  }
   const canRun = Boolean(status?.canRun);
   useEffect(() => { if (status?.defaultDomain) setDomain((current) => current || status.defaultDomain!); }, [status?.defaultDomain]);
 
@@ -437,6 +471,16 @@ export function BacklinkProfileTab() {
                 </table>
               </TableWrap>
             ) : view === 'links' ? (
+              <>
+              {canRun ? (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '0 20px 14px' }}>
+                  <button type="button" className="btn btn-ghost" style={SMALL_BTN} disabled={watching || profile.backlinks.length === 0} onClick={watchLinks}>
+                    {watching ? 'Adding…' : `Watch these ${profile.backlinks.length} in Link Monitor`}
+                  </button>
+                  {watchNote ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>{watchNote}</span> : <span style={{ fontSize: 12, color: 'var(--muted)' }}>The Link Monitor re-checks each link and tells you when one drops.</span>}
+                  {watchNote && onWatched ? <button type="button" className="btn btn-ghost" style={SMALL_BTN} onClick={onWatched}>Open Link Monitor</button> : null}
+                </div>
+              ) : null}
               <TableWrap minWidth={820}>
                 <table className="data-table">
                   <thead><tr><th>From</th><th>To</th><th>Anchor</th><th>Type</th><th>Rank</th><th>Spam</th></tr></thead>
@@ -459,6 +503,7 @@ export function BacklinkProfileTab() {
                   </tbody>
                 </table>
               </TableWrap>
+              </>
             ) : (
               <TableWrap>
                 <table className="data-table">

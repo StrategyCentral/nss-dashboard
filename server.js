@@ -12,6 +12,6 @@ app.prepare().then(() => {
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
   }).listen(port, '0.0.0.0', () => {
-    console.log(`> NSS Dashboard ready on port ${port}`);
+    console.log(`> ACE Marketing Suite ready on port ${port}`);
   });
 });

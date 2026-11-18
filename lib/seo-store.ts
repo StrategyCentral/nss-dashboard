@@ -14,14 +14,16 @@
  * Nothing here is tied to one customer: rows carry the domain they are about.
  */
 import { getDb } from './db';
+import { getAccount } from './account';
 import type { AuditReport } from './seo-audit/crawler';
 import type { RankResult } from './dataforseo';
 
-let schemaReady = false;
+// One flag per database: each customer account has its own file.
+const schemaReady = new WeakSet<object>();
 
 function db() {
   const database = getDb();
-  if (!schemaReady) {
+  if (!schemaReady.has(database)) {
     database.exec(`
       CREATE TABLE IF NOT EXISTS seo_audits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,7 +81,7 @@ function db() {
       );
       CREATE INDEX IF NOT EXISTS idx_seo_rank_checks_tracked ON seo_rank_checks(tracked_id, id DESC);
     `);
-    schemaReady = true;
+    schemaReady.add(database);
   }
   return database;
 }
@@ -105,7 +107,7 @@ export function getDefaultDomain(): string | null {
   try {
     const read = (service: string) =>
       (db().prepare('SELECT key_value FROM api_keys WHERE service = ?').get(service) as any)?.key_value || '';
-    return hostOf(read('gsc_site_main')) || hostOf(read('woocommerce_url')) || hostOf(process.env.SITE_DOMAIN || '');
+    return hostOf(read('gsc_site_main')) || hostOf(read('woocommerce_url')) || hostOf(getAccount().domain) || hostOf(process.env.SITE_DOMAIN || '');
   } catch {
     return hostOf(process.env.SITE_DOMAIN || '');
   }

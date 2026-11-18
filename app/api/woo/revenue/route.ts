@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { requireStore } from '@/lib/account';
 
-const WC_KEY = 'ck_f2fcbdab70d6d74bff230207b02e2369987b2edf';
-const WC_SECRET = 'cs_08088c7f6b33a10b089502ec28d203ed31b79c71';
-const WC_URL = 'https://nationalsalonsupplies.com.au';
 
 // UTM source → channel mapping
 function mapSource(source: string, medium: string): { name: string; color: string; icon: string } {
@@ -23,7 +21,7 @@ function mapSource(source: string, medium: string): { name: string; color: strin
 
 async function fetchWooOrders(params: string): Promise<any[]> {
   const res = await fetch(
-    `${WC_URL}/wp-json/wc/v3/orders?${params}&consumer_key=${WC_KEY}&consumer_secret=${WC_SECRET}&per_page=100`,
+    `${requireStore().url}/wp-json/wc/v3/orders?${params}&consumer_key=${requireStore().key}&consumer_secret=${requireStore().secret}&per_page=100`,
     { next: { revalidate: 3600 } } // cache 1 hour
   );
   if (!res.ok) throw new Error(`WC ${res.status}`);

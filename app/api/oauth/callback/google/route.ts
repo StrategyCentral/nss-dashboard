@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveOAuthToken, getOAuthToken, getDb } from '@/lib/db';
+import { siteUrl } from '@/lib/account';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -35,8 +36,8 @@ export async function GET(req: NextRequest) {
       ga4_property_id: getKey('ga4_property_id'),
       google_ads_customer_id: getKey('google_ads_customer_id'),
       gsc_sites: [
-        getKey('gsc_site_main') || 'https://nationalsalonsupplies.com.au/',
-        getKey('gsc_site_blog') || 'https://nationalsalonsupplies.com.au/beauty/',
+        getKey('gsc_site_main') || (siteUrl() ? `${siteUrl()}/` : ''),
+        getKey('gsc_site_blog'),
       ].filter(Boolean),
     };
 
