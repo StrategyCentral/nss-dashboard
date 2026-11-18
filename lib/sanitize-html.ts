@@ -21,8 +21,9 @@ const DROP_WITH_CONTENT = new Set([
   'link', 'meta', 'base', 'title', 'head', 'audio', 'video', 'source', 'track', 'canvas', 'portal',
 ]);
 const ALLOWED_ATTRS: Record<string, string[]> = {
-  '*': ['title', 'id', 'class', 'lang', 'dir'],
-  a: ['href', 'name', 'target', 'rel'],
+  // No id/name: they could clobber globals on the admin page.
+  '*': ['title', 'class', 'lang', 'dir'],
+  a: ['href', 'target', 'rel'],
   img: ['src', 'alt', 'width', 'height', 'loading'],
   td: ['colspan', 'rowspan', 'align'],
   th: ['colspan', 'rowspan', 'align', 'scope'],
