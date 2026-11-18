@@ -190,6 +190,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Logout */}
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 8px' }}>
           {me && <div style={{ fontSize: 11, color: 'var(--muted)', padding: '0 14px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me.email}</div>}
+          <Link href="/dashboard/password" className={`nav-item${isActive('/dashboard/password') ? ' active' : ''}`}
+            style={isActive('/dashboard/password') ? activeStyle : {}}>
+            <span style={{ width: 18, textAlign: 'center' }}>⚿</span>
+            <span>Change Password</span>
+          </Link>
           <button onClick={logout} className="nav-item" style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer' }}>
             <span style={{ width: 18, textAlign: 'center' }}>→</span>
             <span>Sign Out</span>

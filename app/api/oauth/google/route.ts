@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { newOAuthState, setOAuthStateCookie } from '@/lib/oauth-state';
 
 export async function GET() {
   const session = await getSession();
@@ -7,7 +8,7 @@ export async function GET() {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const redirectUri = `${process.env.NEXTAUTH_URL}/api/oauth/callback/google`;
-  const state = Buffer.from(JSON.stringify({ ts: Date.now() })).toString('base64');
+  const state = newOAuthState();
 
   // All Google scopes in one flow: Ads + Search Console + Analytics
   const scopes = [
@@ -26,5 +27,5 @@ export async function GET() {
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
 
-  return NextResponse.redirect(url.toString());
+  return setOAuthStateCookie(NextResponse.redirect(url.toString()), 'google', state);
 }

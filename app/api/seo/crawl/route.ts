@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { siteUrl } from '@/lib/account';
+import { safeFetch, assertPublicHttpsUrl, UnsafeUrlError } from '@/lib/safe-fetch';
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -12,9 +13,17 @@ export async function POST(req: NextRequest) {
 
   const fullUrl = url.startsWith('http') ? url : `${siteUrl()}${url}`;
 
+  // SSRF guard: https only, and the host must resolve to public addresses only.
+  try {
+    await assertPublicHttpsUrl(fullUrl);
+  } catch (e: any) {
+    const msg = e instanceof UnsafeUrlError ? e.message : 'Invalid URL';
+    return NextResponse.json({ error: `URL not allowed: ${msg}` }, { status: 400 });
+  }
+
   try {
     // Fetch the page with a browser-like UA
-    const pageRes = await fetch(fullUrl, {
+    const pageRes = await safeFetch(fullUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ACE-Marketing-Suite-Crawler/1.0)',
         'Accept': 'text/html,application/xhtml+xml',

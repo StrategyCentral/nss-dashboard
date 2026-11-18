@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkOAuthCallback, oauthRedirect } from '@/lib/oauth-state';
 import { saveOAuthToken, getOAuthToken, getDb } from '@/lib/db';
 import { siteUrl } from '@/lib/account';
 
@@ -8,8 +9,13 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get('error');
   const baseUrl = process.env.NEXTAUTH_URL || '';
 
+  // Only an admin who started this flow here may complete it (CSRF / account-binding guard).
+  const guard = await checkOAuthCallback(req, 'google');
+  if (guard) return oauthRedirect(`${baseUrl}/admin/connections?error=google_${guard}`, 'google');
+
+
   if (error || !code) {
-    return NextResponse.redirect(`${baseUrl}/admin/connections?error=google_denied`);
+    return oauthRedirect(`${baseUrl}/admin/connections?error=google_denied`, 'google');
   }
 
   try {
@@ -26,7 +32,7 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      return NextResponse.redirect(`${baseUrl}/admin/connections?error=google_token`);
+      return oauthRedirect(`${baseUrl}/admin/connections?error=google_token`, 'google');
     }
 
     const db = getDb();
@@ -54,8 +60,8 @@ export async function GET(req: NextRequest) {
       extra_data: JSON.stringify(extra),
     });
 
-    return NextResponse.redirect(`${baseUrl}/admin/connections?success=google`);
+    return oauthRedirect(`${baseUrl}/admin/connections?success=google`, 'google');
   } catch (e: any) {
-    return NextResponse.redirect(`${baseUrl}/admin/connections?error=google_error`);
+    return oauthRedirect(`${baseUrl}/admin/connections?error=google_error`, 'google');
   }
 }

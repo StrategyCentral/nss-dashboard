@@ -11,7 +11,15 @@ import { getPlatformDb } from './db';
  * A user belongs to one customer account, or to none: ACE staff, who can
  * open every account and manage them.
  */
-const SECRET = process.env.JWT_SECRET || 'nss-dashboard-secret-change-me';
+// Fail closed: without JWT_SECRET no session is ever signed or accepted.
+function getSecret(): string | null {
+  const s = process.env.JWT_SECRET;
+  if (!s) {
+    console.error('[auth] JWT_SECRET is not set; refusing to sign or verify sessions');
+    return null;
+  }
+  return s;
+}
 
 export const PASSWORD_COOKIE = 'nss_token';
 export const SSO_COOKIE = 'ams_session';
@@ -30,12 +38,16 @@ export interface Session {
 }
 
 export function signToken(payload: object) {
-  return jwt.sign(payload, SECRET, { expiresIn: '7d' });
+  const secret = getSecret();
+  if (!secret) throw new Error('Server auth is not configured');
+  return jwt.sign(payload, secret, { expiresIn: '7d', algorithm: 'HS256' });
 }
 
 export function verifyToken(token: string) {
+  const secret = getSecret();
+  if (!secret) return null;
   try {
-    return jwt.verify(token, SECRET) as { id: number; email: string; role: string };
+    return jwt.verify(token, secret, { algorithms: ['HS256'] }) as { id: number; email: string; role: string };
   } catch {
     return null;
   }
