@@ -7,16 +7,18 @@ import Link from 'next/link';
 // PROJECTS/ACE BUSINESS SUITE/ace-business-suite-architecture.md §4.1
 // Sub-tabs (Overview > Overall ROI / Revenue Attribution / etc; SEO > Rankings / Link Monitor / etc)
 // are rendered as top-of-page tabs inside each section, not in this sidebar.
-const NAV = [
+const NAV: { href: string; icon: string; label: string; match?: string[] }[] = [
   { href: '/dashboard',                 icon: '◈', label: 'Overview' },
   { href: '/dashboard/timeline',        icon: '◷', label: 'Timeline' },
   { href: '/dashboard/money-map',       icon: '⌖', label: 'Money Map' },
   { href: '/dashboard/seo',             icon: '◎', label: 'SEO' },
-  { href: '/dashboard/meta-ads',        icon: 'M', label: 'Meta Ads' },
-  { href: '/dashboard/google-ads',      icon: 'G', label: 'Google Ads' },
-  { href: '/dashboard/tiktok-ads',      icon: '♪', label: 'TikTok Ads' },
-  { href: '/dashboard/reddit-ads',      icon: 'R', label: 'Reddit Ads' },
-  { href: '/dashboard/pinterest-ads',   icon: 'P', label: 'Pinterest Ads' },
+  // Paid Ads: Meta / Google / TikTok / Reddit / Pinterest are tabs across the top of the page.
+  { href: '/dashboard/paid-ads',        icon: '$', label: 'Paid Ads',
+    match: ['/dashboard/paid-ads', '/dashboard/meta-ads', '/dashboard/google-ads', '/dashboard/tiktok-ads', '/dashboard/reddit-ads', '/dashboard/pinterest-ads', '/dashboard/youtube-ads'] },
+  // Other ACE apps, shown inside the suite (see lib/linked-apps.ts).
+  { href: '/dashboard/influence',       icon: '✦', label: 'Influence' },
+  { href: '/dashboard/tube-stats',      icon: '▶', label: 'Tube Stats' },
+  { href: '/dashboard/lead-shop',       icon: '⊕', label: 'Lead Shop' },
 ];
 const ADMIN = [
   { href: '/admin/connections',  icon: '⟳', label: 'Connections' },
@@ -76,7 +78,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === '/dashboard';
-    return pathname.startsWith(href);
+    const match = NAV.find(n => n.href === href)?.match || [href];
+    return match.some(m => pathname.startsWith(m));
   }
 
   const isAdmin = me?.role === 'admin';
