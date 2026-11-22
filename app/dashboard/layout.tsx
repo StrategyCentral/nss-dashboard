@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { AccountSwitcher, SettingsMenu } from './_components/NavMenus';
 
 // Canonical sidebar — see brain doc:
 // PROJECTS/ACE BUSINESS SUITE/ace-business-suite-architecture.md §4.1
@@ -71,11 +72,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/');
   }
 
-  async function switchAccount(id: number) {
-    const r = await fetch('/api/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'switch', id }) });
-    if (r.ok) window.location.reload();
-  }
-
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === '/dashboard';
     const match = NAV.find(n => n.href === href)?.match || [href];
@@ -85,23 +81,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isAdmin = me?.role === 'admin';
   const adminItems = isAdmin ? [...ADMIN, ...(me?.platform ? STAFF : [])] : [];
   const activeStyle = { background: 'rgba(231,37,141,0.12)', color: 'var(--pink)' };
-
-  // Which customer's data is on screen. ACE staff can switch; a customer just sees their own name.
-  const accountPicker = me && (
-    me.platform && (me.accounts?.length || 0) > 1 ? (
-      <select
-        aria-label="Customer account"
-        value={me.account.id}
-        onChange={e => switchAccount(Number(e.target.value))}
-        className="form-input"
-        style={{ padding: '6px 8px', fontSize: 12, fontWeight: 600, width: embedded ? 220 : '100%' }}
-      >
-        {me.accounts!.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-      </select>
-    ) : (
-      <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}>{me.account.name}</div>
-    )
-  );
 
   if (embedded) {
     return (
@@ -115,17 +94,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <span>{item.label}</span>
               </Link>
             ))}
-            {adminItems.length > 0 && <span style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 6px', flexShrink: 0 }} />}
-            {adminItems.map(item => (
-              <Link key={item.href} href={item.href} className={`nav-item${isActive(item.href) ? ' active' : ''}`}
-                style={{ padding: '7px 10px', whiteSpace: 'nowrap', fontSize: 12, ...(isActive(item.href) ? activeStyle : {}) }}>
-                <span>{item.label}</span>
-              </Link>
-            ))}
           </nav>
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 10, fontFamily: CONDENSED, letterSpacing: '0.1em', color: 'var(--muted)', textTransform: 'uppercase' }}>Account</span>
-            {accountPicker}
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Admin pages live in one Settings menu, kept out of the scrolling nav so the menu is never clipped. */}
+            <SettingsMenu items={adminItems} pathname={pathname} />
+            {me && (
+              <>
+                <span style={{ width: 1, height: 18, background: 'var(--border)' }} />
+                <span style={{ fontSize: 10, fontFamily: CONDENSED, letterSpacing: '0.1em', color: 'var(--muted)', textTransform: 'uppercase' }}>Account</span>
+                <AccountSwitcher me={me} side="right" width={me.platform ? 210 : 'auto'} />
+              </>
+            )}
           </div>
         </header>
         <main style={{ padding: '24px 24px 40px' }}>{children}</main>
@@ -159,7 +138,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {me && (
             <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 10, fontFamily: CONDENSED, letterSpacing: '0.1em', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>Account</div>
-              {accountPicker}
+              <AccountSwitcher me={me} side="left" />
               {me.account.domain && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{me.account.domain}</div>}
             </div>
           )}
@@ -178,7 +157,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {adminItems.length > 0 && (
             <>
-              <div style={{ fontSize: 10, fontFamily: CONDENSED, letterSpacing: '0.1em', color: 'var(--muted)', padding: '16px 14px 4px', textTransform: 'uppercase' }}>Admin</div>
+              <div style={{ fontSize: 10, fontFamily: CONDENSED, letterSpacing: '0.1em', color: 'var(--muted)', padding: '16px 14px 4px', textTransform: 'uppercase' }}>Settings</div>
               {adminItems.map(item => (
                 <Link key={item.href} href={item.href} className={`nav-item${isActive(item.href) ? ' active' : ''}`}
                   style={isActive(item.href) ? activeStyle : {}}>

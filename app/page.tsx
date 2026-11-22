@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -8,13 +8,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Arrived from a linked app's login page: go straight back to that app after signing in.
+  const [next, setNext] = useState('');
+  useEffect(() => {
+    const n = new URLSearchParams(window.location.search).get('next') || '';
+    if (/^\/api\/apps\/[a-z0-9-]{1,40}\/launch$/.test(n)) setNext(n);
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true); setError('');
     const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
     const data = await res.json();
-    if (res.ok) { router.push('/dashboard'); }
+    if (res.ok) { if (next) window.location.href = next; else router.push('/dashboard'); }
     else { setError(data.error || 'Login failed'); setLoading(false); }
   }
 
@@ -60,7 +66,7 @@ export default function LoginPage() {
           </form>
 
           <p style={{ fontSize:11, color:'var(--muted)', marginTop:20, textAlign:'center' }}>
-            ACE team? <a href="/sso/consume" style={{ color:'var(--pink)' }}>Sign in with the ACE Hub</a>
+            ACE team? <a href={next ? `/sso/consume?next=${encodeURIComponent(next)}` : '/sso/consume'} style={{ color:'var(--pink)' }}>Sign in with the ACE Hub</a>
           </p>
         </div>
 
