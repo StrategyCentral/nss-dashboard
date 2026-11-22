@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { newOAuthState, setOAuthStateCookie } from '@/lib/oauth-state';
 
 export async function GET() {
   const session = await getSession();
@@ -7,10 +8,10 @@ export async function GET() {
 
   const clientId = process.env.LINKEDIN_CLIENT_ID;
   const redirectUri = `${process.env.NEXTAUTH_URL}/api/oauth/callback/linkedin`;
-  const state = Buffer.from(JSON.stringify({ ts: Date.now() })).toString('base64');
+  const state = newOAuthState();
   const scope = encodeURIComponent('r_ads r_ads_reporting rw_ads');
 
   const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${scope}`;
 
-  return NextResponse.redirect(url);
+  return setOAuthStateCookie(NextResponse.redirect(url), 'linkedin', state);
 }

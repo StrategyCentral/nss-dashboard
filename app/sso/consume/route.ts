@@ -34,7 +34,14 @@ function publicUrl(request: NextRequest, path: string): string {
 }
 
 function safeNext(next: string | null): string {
-  if (!next || next === '/' || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/sso') || next.startsWith('/api/')) return '/dashboard';
+  if (!next || next === '/' || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')
+    || /[\u0000-\u001f\u007f]/.test(next) || next.startsWith('/sso') || next.startsWith('/api/')) return '/dashboard';
+  try {
+    const base = 'https://suite.invalid';
+    if (new URL(next, base).origin !== base) return '/dashboard';
+  } catch {
+    return '/dashboard';
+  }
   return next;
 }
 

@@ -26,6 +26,8 @@ export async function GET(_req: NextRequest, ctx: { params: { id: string } }) {
 export async function PUT(req: NextRequest, ctx: { params: { id: string } }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Viewers can read articles; only admins edit or delete them.
+  if (session.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   try {
     const db = getDb();
     const id = Number(ctx.params.id);
@@ -59,6 +61,8 @@ export async function PUT(req: NextRequest, ctx: { params: { id: string } }) {
 export async function DELETE(_req: NextRequest, ctx: { params: { id: string } }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Viewers can read articles; only admins edit or delete them.
+  if (session.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   try {
     const db = getDb();
     const id = Number(ctx.params.id);

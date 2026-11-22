@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkOAuthCallback, oauthRedirect } from '@/lib/oauth-state';
 import { saveOAuthToken } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
@@ -7,8 +8,13 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get('error');
   const baseUrl = process.env.NEXTAUTH_URL || '';
 
+  // Only an admin who started this flow here may complete it (CSRF / account-binding guard).
+  const guard = await checkOAuthCallback(req, 'linkedin');
+  if (guard) return oauthRedirect(`${baseUrl}/admin/connections?error=linkedin_${guard}`, 'linkedin');
+
+
   if (error || !code) {
-    return NextResponse.redirect(`${baseUrl}/admin/connections?error=linkedin_denied`);
+    return oauthRedirect(`${baseUrl}/admin/connections?error=linkedin_denied`, 'linkedin');
   }
 
   try {
@@ -27,7 +33,7 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      return NextResponse.redirect(`${baseUrl}/admin/connections?error=linkedin_token`);
+      return oauthRedirect(`${baseUrl}/admin/connections?error=linkedin_token`, 'linkedin');
     }
 
     const expiresAt = tokenData.expires_in
@@ -41,9 +47,9 @@ export async function GET(req: NextRequest) {
       scope: tokenData.scope,
     });
 
-    return NextResponse.redirect(`${baseUrl}/admin/connections?success=linkedin`);
+    return oauthRedirect(`${baseUrl}/admin/connections?success=linkedin`, 'linkedin');
   } catch (e: any) {
     console.error('LinkedIn OAuth error:', e);
-    return NextResponse.redirect(`${baseUrl}/admin/connections?error=linkedin_error`);
+    return oauthRedirect(`${baseUrl}/admin/connections?error=linkedin_error`, 'linkedin');
   }
 }

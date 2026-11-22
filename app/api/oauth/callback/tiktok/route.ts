@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkOAuthCallback, oauthRedirect } from '@/lib/oauth-state';
 import { saveOAuthToken } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
@@ -7,8 +8,13 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get('error');
   const baseUrl = process.env.NEXTAUTH_URL || '';
 
+  // Only an admin who started this flow here may complete it (CSRF / account-binding guard).
+  const guard = await checkOAuthCallback(req, 'tiktok');
+  if (guard) return oauthRedirect(`${baseUrl}/admin/connections?error=tiktok_${guard}`, 'tiktok');
+
+
   if (error || !code) {
-    return NextResponse.redirect(`${baseUrl}/admin/connections?error=tiktok_denied`);
+    return oauthRedirect(`${baseUrl}/admin/connections?error=tiktok_denied`, 'tiktok');
   }
 
   try {
@@ -24,7 +30,7 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json();
 
     if (tokenData.code !== 0 || !tokenData.data?.access_token) {
-      return NextResponse.redirect(`${baseUrl}/admin/connections?error=tiktok_token`);
+      return oauthRedirect(`${baseUrl}/admin/connections?error=tiktok_token`, 'tiktok');
     }
 
     const { access_token, refresh_token, expires_in, advertiser_ids } = tokenData.data;
@@ -39,9 +45,9 @@ export async function GET(req: NextRequest) {
       extra_data: JSON.stringify({ advertiser_ids }),
     });
 
-    return NextResponse.redirect(`${baseUrl}/admin/connections?success=tiktok`);
+    return oauthRedirect(`${baseUrl}/admin/connections?success=tiktok`, 'tiktok');
   } catch (e: any) {
     console.error('TikTok OAuth error:', e);
-    return NextResponse.redirect(`${baseUrl}/admin/connections?error=tiktok_error`);
+    return oauthRedirect(`${baseUrl}/admin/connections?error=tiktok_error`, 'tiktok');
   }
 }
