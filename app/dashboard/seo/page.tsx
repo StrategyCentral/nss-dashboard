@@ -5,6 +5,7 @@ import ArticleWriterTab from './_article-writer';
 import SiteAuditTab from './_site-audit';
 import { KeywordResearchTab, BacklinkProfileTab } from './_research';
 import RankTrackerTab from './_rank-tracker';
+import LinkedAppFrame from '../_components/LinkedAppFrame';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1265,17 +1266,19 @@ export default function SeoPage() {
   const [addKwForm, setAddKwForm] = useState({ keyword: '', url: '', category: 'Waxing', volume: '', position: '' });
   const [saving, setSaving] = useState(false);
   const [source, setSource] = useState('demo');
-  const [mainTab, setMainTab] = useState<'rankings'|'structure'|'links'|'articles'|'audit'|'research'|'backlinks'|'tracker'>('rankings');
+  const [mainTab, setMainTab] = useState<'rankings'|'structure'|'links'|'articles'|'audit'|'research'|'backlinks'|'tracker'|'engine'>('rankings');
   // Keyword handed from Keyword Research to the Article Writer.
   const [writeKeyword, setWriteKeyword] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  // The Backlink Engine is one shared engine for now: ACE staff only.
+  const [isStaff, setIsStaff] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
 
   useEffect(() => {
     loadKeywords();
     loadStructure();
-    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => setIsAdmin(d?.role === 'admin')).catch(() => {});
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => { setIsAdmin(d?.role === 'admin'); setIsStaff(!!d?.platform); }).catch(() => {});
   }, []);
 
   async function loadKeywords() {
@@ -1384,6 +1387,7 @@ export default function SeoPage() {
         <button style={TAB_STYLE(mainTab === 'structure', '#04aae8')} onClick={() => setMainTab('structure')}>⊞ Site Structure</button>
         <button style={TAB_STYLE(mainTab === 'backlinks', '#ff1e8e')} onClick={() => setMainTab('backlinks')}>⇄ Backlink Profile</button>
         <button style={TAB_STYLE(mainTab === 'links', '#ff1e8e')} onClick={() => setMainTab('links')}>🔗 Link Monitor</button>
+        {isStaff && <button style={TAB_STYLE(mainTab === 'engine', '#ff1e8e')} onClick={() => setMainTab('engine')}>⚙ Backlink Engine</button>}
       </div>
 
       {/* Rankings Tab */}
@@ -1595,6 +1599,10 @@ export default function SeoPage() {
       {mainTab === 'audit' && <SiteAuditTab isAdmin={isAdmin} />}
       {mainTab === 'research' && <KeywordResearchTab onWrite={(keyword) => { setWriteKeyword(keyword); setMainTab('articles'); }} />}
       {mainTab === 'backlinks' && <BacklinkProfileTab onWatched={() => setMainTab('links')} />}
+      {mainTab === 'engine' && isStaff && (
+        <LinkedAppFrame compact slug="backlink-engine" name="Backlink Engine" accent="#ff1e8e"
+          blurb="Syndicates new posts, tracks directory listings and watches for journalist requests" />
+      )}
 
     </div>
   );

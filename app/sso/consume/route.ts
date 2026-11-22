@@ -33,7 +33,11 @@ function publicUrl(request: NextRequest, path: string): string {
   return host ? new URL(path, `${proto}://${host}`).toString() : new URL(path, request.url).toString();
 }
 
+// After signing in, the only /api path allowed as a landing spot: opening a linked app.
+const APP_LAUNCH = /^\/api\/apps\/[a-z0-9-]{1,40}\/launch$/;
+
 function safeNext(next: string | null): string {
+  if (next && APP_LAUNCH.test(next)) return next;
   if (!next || next === '/' || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')
     || /[\u0000-\u001f\u007f]/.test(next) || next.startsWith('/sso') || next.startsWith('/api/')) return '/dashboard';
   try {

@@ -119,6 +119,47 @@ function ConfiguredPill({ count, total }: { count: number; total: number }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
+/**
+ * YouTube (Tube Stats). Google sign-in for the channel happens inside Tube
+ * Stats itself, so this card is the signpost: it shows which channel was last
+ * linked and takes people to the one button they need.
+ */
+function TubeStatsCard() {
+  const [info, setInfo] = useState<{ connected: boolean; title: string; at: string } | null>(null);
+  useEffect(() => {
+    fetch('/api/apps/tube-stats/connection').then(r => r.ok ? r.json() : null).then(setInfo).catch(() => {});
+  }, []);
+  const linked = !!info?.title;
+  const when = info?.at ? new Date(info.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  return (
+    <>
+      <div style={{ marginBottom: 8, fontSize: 11, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: '0.1em', color: 'var(--muted)', textTransform: 'uppercase', padding: '0 2px' }}>Video</div>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 24px' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(255,68,68,0.1)', border: '1px solid rgba(255,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#ff4444', fontSize: 18 }}>
+            ▶
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 800, fontSize: 15 }}>YouTube channel (Tube Stats)</span>
+              {linked ? <ConnectedBadge /> : <NotConnectedBadge />}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
+              {linked
+                ? <>Channel: <strong style={{ color: 'var(--text)' }}>{info!.title}</strong>{when && <> · last signed in {when}</>}. Google asks you to sign in again each visit; it is one click inside Tube Stats.</>
+                : <>Open Tube Stats and press <strong style={{ color: 'var(--text)' }}>Sign in with Google</strong>, using the Google account that owns the YouTube channel. That is the only step.</>}
+            </div>
+          </div>
+          <a href="/dashboard/tube-stats" className="btn btn-ghost" style={{ fontSize: 12, padding: '7px 14px', flexShrink: 0, textDecoration: 'none' }}>
+            {linked ? 'Open Tube Stats →' : 'Connect in Tube Stats →'}
+          </a>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
 export default function ConnectionsPageWrapper() {
   return <Suspense fallback={null}><ConnectionsPage /></Suspense>;
 }
@@ -567,6 +608,9 @@ function ConnectionsPage() {
           </div>
         )}
       </div>
+
+      {/* ── TUBE STATS ── */}
+      <TubeStatsCard />
 
       {/* Info note */}
       <div className="card" style={{ marginTop: 4 }}>

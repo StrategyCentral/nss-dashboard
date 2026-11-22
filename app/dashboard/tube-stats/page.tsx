@@ -5,5 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export default function Page() {
   const app = LINKED_APPS['tube-stats'];
-  return <LinkedAppFrame slug={app.slug} name={app.name} blurb={app.blurb} accent="#ff4444" />;
+  let origin = '';
+  try { origin = new URL(app.url).origin; } catch {}
+  return <LinkedAppFrame slug={app.slug} name={app.name} blurb={app.blurb} accent="#ff4444" origin={origin} />;
 }
