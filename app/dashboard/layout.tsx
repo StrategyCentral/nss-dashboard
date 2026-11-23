@@ -16,6 +16,8 @@ const NAV: { href: string; icon: string; label: string; match?: string[] }[] = [
   // Paid Ads: Meta / Google / TikTok / Reddit / Pinterest are tabs across the top of the page.
   { href: '/dashboard/paid-ads',        icon: '$', label: 'Paid Ads',
     match: ['/dashboard/paid-ads', '/dashboard/meta-ads', '/dashboard/google-ads', '/dashboard/tiktok-ads', '/dashboard/reddit-ads', '/dashboard/pinterest-ads', '/dashboard/youtube-ads'] },
+  // Ecommerce: Merchant Centres / Product Feeds are tabs across the top of the page.
+  { href: '/dashboard/ecommerce',       icon: '⛁', label: 'Ecommerce' },
   // Other ACE apps, shown inside the suite (see lib/linked-apps.ts).
   { href: '/dashboard/influence',       icon: '✦', label: 'Influence' },
   { href: '/dashboard/tube-stats',      icon: '▶', label: 'Tube Stats' },
